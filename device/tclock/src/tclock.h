@@ -29,7 +29,7 @@ class ToddlerClock : public mysook::Firmware {
 
         ToddlerClockConfig config = {
             .morning_time = { .h=7u, .m=0u },
-            .sleeping_time = { .h=19u, .m=30u },
+            .sleeping_time = { .h=19u, .m=0u },
             .night_color = { .r=255u, .g=170u, .b=0u, .brightness=2u },
             .day_color = { .r=0u, .g=80u, .b=255u, .brightness=5u }
         };

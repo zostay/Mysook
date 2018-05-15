@@ -27,6 +27,7 @@ void ToddlerClock::color_screen(DateTime &d, uint8_t r, uint8_t g, uint8_t b, ui
     for (int y = 0; y < 8; ++y) {
         for (int x = 0; x < 4; ++x) {
             if (i++ % 2 == d.day() % 2) {
+                logf_ln("Set pixel (%d, %d) to (0, 0, 0)", x, y);
                 panel->set_pixel(x, y, 0, 0, 0);
             }
         }
@@ -47,7 +48,7 @@ void ToddlerClock::setup() {
 void ToddlerClock::loop() {
     DateTime now = rtc->now();
 
-    logf("%d:%d:%d", now.hour(), now.minute(), now.second());
+    logf("%02d:%02d:%02d", now.hour(), now.minute(), now.second());
     if (before_time(now, config.morning_time)) {
         logf_ln(" is early morning.");
         color_screen(now, config.night_color);
