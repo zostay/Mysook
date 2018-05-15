@@ -8,16 +8,12 @@ namespace mysook {
 
 template <int W, int H>
 class RGBPanel {
-    protected:
-        uint8_t brightness;
-        Color grid[W][H];
-
     public:
         int panel_width() { return W; }
         int panel_height() { return H; }
 
         virtual void set_pixel(int x, int y, uint8_t r, uint8_t g, uint8_t b) {
-            grid[x][y] = Color(r, b, g);
+            set_pixel(x, y, Color(r, g, b));
         }
         virtual void set_pixel(int x, int y, Color c) = 0;
 

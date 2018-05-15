@@ -1,6 +1,8 @@
 #ifndef __ARDUINO_PANEL_H
 #define __ARDUINO_PANEL_H
 
+#include <Adafruit_NeoMatrix.h>
+
 namespace mysook {
 
 template <int W, int H> 

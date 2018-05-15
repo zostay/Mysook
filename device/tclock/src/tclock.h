@@ -7,7 +7,7 @@
 #include <RTC.h>
 
 struct TimeSetting {
-  uint8_t h, m;
+  int8_t h, m;
 };
 
 struct ColorSetting {
@@ -28,8 +28,8 @@ class ToddlerClock : public mysook::Firmware {
         mysook::RTC *rtc;
 
         ToddlerClockConfig config = {
-            .morning_time = { .h=7u, .m=0u },
-            .sleeping_time = { .h=19u, .m=0u },
+            .morning_time = { .h=7, .m=2 },
+            .sleeping_time = { .h=19, .m=0 },
             .night_color = { .r=255u, .g=170u, .b=0u, .brightness=2u },
             .day_color = { .r=0u, .g=80u, .b=255u, .brightness=5u }
         };
@@ -39,6 +39,10 @@ class ToddlerClock : public mysook::Firmware {
         void color_screen(DateTime &d, ColorSetting &c) {
             color_screen(d, c.r, c.g, c.b, c.brightness);
         }
+
+        bool before_time(DateTime &check, TimeSetting &against);
+        bool before_transition_time(DateTime &check, TimeSetting &against);
+        ColorSetting make_transition_color(DateTime &now, ColorSetting &from, ColorSetting &to);
 
     public:
         ToddlerClock(mysook::Logger *log, mysook::RGBPanel<4,8> *panel, mysook::RTC *rtc);

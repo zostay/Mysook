@@ -34,10 +34,9 @@ void setup() {
     light.begin();
     pfc8523.begin();
 
-    //rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-    //rtc.adjust(DateTime(2018, 04, 22, 20, 0, 0));
-    //rtc.adjust(DateTime(2018, 04, 22, 19, 29, 30));
-    //rtc.adjust(DateTime(2018, 04, 22, 6, 59, 30));
+    //pfc8523.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    //pfc8523.adjust(DateTime(2018, 5, 15, 18, 58, 55));
+    //pfc8523.adjust(DateTime(2018, 5, 15, 7, 0, 55));
 
     Serial.begin(57600);
 #endif//ARDUINO
