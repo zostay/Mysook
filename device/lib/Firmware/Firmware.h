@@ -1,7 +1,10 @@
 #ifndef __FIRMWARE_H
 #define __FIRMWARE_H
 
+#ifdef ARDUINO
 #include <Arduino.h>
+#endif//ARDUINO
+
 #include <Logger.h>
 
 namespace mysook {
@@ -20,13 +23,15 @@ class Firmware {
 
         void tick() {
             loop();
-            delay(tick_speed());
+
+            int wait = tick_speed();
+            if (wait > 0) delay(wait);
         }
 
-        virtual void write_log(char *msg) { log->write_log(msg); }
+        virtual void write_log(const char *msg) { log->write_log(msg); }
 
-        void logf_ln(char *fmt...);
-        void logf(char *fmt...);
+        void logf_ln(const char *fmt...);
+        void logf(const char *fmt...);
 };
 
 };

@@ -5,7 +5,7 @@ namespace mysook {
 
 class Logger {
     public:
-        virtual void write_log(char *str) = 0;
+        virtual void write_log(const char *str) = 0;
 };
 
 };

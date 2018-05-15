@@ -13,7 +13,7 @@ class MC_Logger : public Logger {
     public:
         MC_Logger(T *serial) { this->serial = serial; }
 
-        virtual void write_log(char *str) { serial->print(str); }
+        virtual void write_log(const char *str) { serial->print(str); }
 };
 
 };
