@@ -2,7 +2,8 @@
 
 using namespace mysook;
 
-ToddlerClock::ToddlerClock(RGBPanel<4,8> *panel, RTC *rtc) {
+ToddlerClock::ToddlerClock(Logger *log, RGBPanel<4,8> *panel, RTC *rtc) 
+: Firmware(log) {
     this->panel = panel;
     this->rtc   = rtc;
 }
@@ -46,19 +47,19 @@ void ToddlerClock::setup() {
 void ToddlerClock::loop() {
     DateTime now = rtc->now();
 
-    log("%d:%d:%d", now.hour(), now.minute(), now.second());
+    logf("%d:%d:%d", now.hour(), now.minute(), now.second());
     if (before_time(now, config.morning_time)) {
-        log_ln(" is early morning.");
+        logf_ln(" is early morning.");
         color_screen(now, config.night_color);
     }
 
     else if (before_time(now, config.sleeping_time)) {
-        log_ln(" is day.");
+        logf_ln(" is day.");
         color_screen(now, config.day_color);
     }
 
     else {
-        log_ln(" is night.");
+        logf_ln(" is night.");
         color_screen(now, config.night_color);
     }
 }

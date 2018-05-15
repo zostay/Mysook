@@ -2,6 +2,7 @@
 #define __TCLOCK_H
 
 #include <Firmware.h>
+#include <Logger.h>
 #include <Panel.h>
 #include <RTC.h>
 
@@ -40,7 +41,7 @@ class ToddlerClock : public mysook::Firmware {
         }
 
     public:
-        ToddlerClock(mysook::RGBPanel<4,8> *panel, mysook::RTC *rtc);
+        ToddlerClock(mysook::Logger *log, mysook::RGBPanel<4,8> *panel, mysook::RTC *rtc);
         ~ToddlerClock();
 
         void setup();

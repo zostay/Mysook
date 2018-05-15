@@ -1,15 +1,17 @@
+#include "tclock.h"
+
+#define NEOPIXELS 13
+
+#ifdef ARDUINO
 #include <Adafruit_GFX.h>
 #include <Adafruit_NeoMatrix.h>
 #include <Adafruit_NeoPixel.h>
 #include <RTClib.h>
 #include <Wire.h>
 
-#include "tclock.h"
-
+#include <MC_Logger.h>
 #include <MC_Panel.h>
 #include <MC_RTC.h>
-
-#define NEOPIXELS 13
 
 Adafruit_NeoMatrix light = Adafruit_NeoMatrix(4, 8, NEOPIXELS,
   NEO_MATRIX_TOP  + NEO_MATRIX_RIGHT +
@@ -20,10 +22,13 @@ RTC_PCF8523 pfc8523;
 
 mysook::MC_RGBPanel<4,8> panel(&light);
 mysook::MC_RTC<RTC_PCF8523> rtc(&pfc8523);
+mysook::MC_Logger<Print> logger(&Serial);
+#endif//ARDUINO
 
-ToddlerClock tclock(&panel, &rtc);
+ToddlerClock tclock(&logger, &panel, &rtc);
 
 void setup() {
+#ifdef ARDUINO
     pinMode(NEOPIXELS, OUTPUT);
 
     light.begin();
@@ -35,6 +40,7 @@ void setup() {
     //rtc.adjust(DateTime(2018, 04, 22, 6, 59, 30));
 
     Serial.begin(57600);
+#endif//ARDUINO
 
     tclock.setup();
 }

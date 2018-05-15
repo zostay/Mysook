@@ -2,12 +2,17 @@
 #define __FIRMWARE_H
 
 #include <Arduino.h>
-#include <cstdarg>
+#include <Logger.h>
 
 namespace mysook {
 
 class Firmware {
+    protected:
+        Logger *log;
+
     public:
+        Firmware(Logger *log) { this->log = log; }
+
         virtual int tick_speed() { return 0; }
     
         virtual void setup() = 0;
@@ -18,8 +23,10 @@ class Firmware {
             delay(tick_speed());
         }
 
-        void log_ln(char *fmt...) { }
-        void log(char *fmt...) { }
+        virtual void write_log(char *msg) { log->write_log(msg); }
+
+        void logf_ln(char *fmt...);
+        void logf(char *fmt...);
 };
 
 };
