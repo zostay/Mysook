@@ -26,6 +26,7 @@ void ToddlerClock::color_screen(DateTime &d, uint8_t r, uint8_t g, uint8_t b, ui
     for (int y = 0; y < 8; ++y) {
         for (int x = 0; x < 4; ++x) {
             if (i++ % 2 == d.day() % 2) {
+                logf_ln("Set pixel (%d, %d) to (#%02x%02x%02x)", x, y, r, g, b);
                 panel->set_pixel(x, y, r, g, b);
             }
         }
@@ -74,11 +75,11 @@ ColorSetting ToddlerClock::make_transition_color(DateTime &now, ColorSetting &fr
     return c;
 }
 
-void ToddlerClock::setup() {
+void ToddlerClock::start() {
     blank_screen();
 }
 
-void ToddlerClock::loop() {
+void ToddlerClock::tick() {
     DateTime now = rtc->now();
 
     logf("%02d:%02d:%02d", now.hour(), now.minute(), now.second());

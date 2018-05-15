@@ -48,10 +48,10 @@ class ToddlerClock : public mysook::Firmware {
         ToddlerClock(mysook::Logger *log, mysook::RGBPanel<4,8> *panel, mysook::RTC *rtc);
         ~ToddlerClock();
 
-        void setup();
-        void loop();
+        virtual void start();
+        virtual void tick();
 
-        int tick_speed() { return 1000; }
+        virtual unsigned long tick_speed() { return 1000000ul; }
 };
 
 #endif//__TCLOCK_H

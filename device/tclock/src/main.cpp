@@ -45,5 +45,5 @@ void setup() {
 }
 
 void loop() {
-    tclock.tick();
+    tclock.loop();
 }
