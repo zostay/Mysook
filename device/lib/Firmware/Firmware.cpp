@@ -25,19 +25,23 @@ unsigned long Firmware::get_micros() {
 }
 #endif//ARDUINO
 
+void Firmware::next_tick_after(unsigned long wait) {
+    if (ULONG_MAX - previous_tick < wait) {
+        next_tick_at(wait - (ULONG_MAX - previous_tick), previous_tick);
+    }
+    else {
+        next_tick_at(previous_tick + wait);
+    }
+}
+
+// checks if tick_speed() micros have passed, accounting for rollovers, which
+// happen every 4,294.967296 seconds.
 bool Firmware::ready_for_tick() {
     unsigned long now = get_micros();
-    if (now >= next_tick && now <= rollover) {
-        unsigned long wait = tick_speed();
 
-        if (ULONG_MAX - now < wait) {
-            rollover = next_tick;
-            next_tick = wait - (ULONG_MAX - now);
-        }
-        else {
-            rollover = ULONG_MAX;
-            next_tick = now + wait;
-        }
+    if ((now >= next_tick && now <= rollover)) {
+        previous_tick = next_tick;
+        next_tick_after(tick_speed());
 
         return true;
     }

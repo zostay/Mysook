@@ -15,17 +15,8 @@ class Firmware {
         Logger *log;
 
         unsigned long rollover = ULONG_MAX;
+        unsigned long previous_tick = 0;
         unsigned long next_tick = 0;
-
-#ifdef ARDUINO
-        unsigned long get_micros() { return micros(); }
-#else
-        unsigned long get_micros();
-#endif
-
-        // checks if tick_speed() micros have passed, accounting for rollovers,
-        // which happen every 4,294.967296 seconds.
-        bool ready_for_tick();
 
     public:
         Firmware(Logger *log) { this->log = log; }
@@ -36,8 +27,32 @@ class Firmware {
         virtual void tick() = 0;
         virtual void idle() { }
 
+#ifdef ARDUINO
+        unsigned long get_micros() { return micros(); }
+#else
+        unsigned long get_micros();
+#endif
+
+        void set_previous_tick() { previous_tick = get_micros(); }
+        void set_previous_tick(unsigned long tick) { previous_tick = tick; }
+
+        void nudge_tick() { next_tick_after(tick_speed()); }
+        void reset_tick() { set_previous_tick(); next_tick_after(tick_speed()); }
+
+        void next_tick_after(unsigned long wait); 
+        void next_tick_at(unsigned long time, unsigned long rollover = ULONG_MAX) {
+            next_tick = time;
+            rollover = rollover;
+        }
+
+        virtual bool ready_for_tick();
+
         void setup() {
             start();
+
+            if (ready_for_tick()) {
+                tick();
+            }
         }
 
         void loop() {
