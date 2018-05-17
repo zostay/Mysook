@@ -3,8 +3,10 @@
 #include <climits>
 
 #ifndef ARDUINO
-#include <sys/time.h>
+#include <sys/time.h> // precision clock
+#include <errno.h>
 #include <cstdio>
+#include <cstring>
 #endif
 
 using namespace mysook;

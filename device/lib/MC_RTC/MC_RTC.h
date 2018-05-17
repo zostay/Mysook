@@ -1,7 +1,7 @@
 #ifndef __ARDUINO_RTC_H
 #define __ARDUINO_RTC_H
 
-#include "rtc.h"
+#include <RTC.h>
 
 namespace mysook {
 
@@ -13,7 +13,9 @@ class MC_RTC : public RTC {
     public:
         MC_RTC(T *chip) { this->chip = chip; }
 
-        virtual DateTime now() { return chip->now(); }
+        virtual DateTime now() { 
+            return DateTime(DateTime.chip->now().unixtime()); 
+        }
 };
 
 };

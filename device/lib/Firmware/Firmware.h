@@ -19,7 +19,10 @@ class Firmware {
         unsigned long next_tick = 0;
 
     public:
-        Firmware(Logger *log) { this->log = log; }
+        Firmware(Logger *log) { 
+            next_tick = get_micros();
+			this->log = log; 
+		}
 
         virtual unsigned long tick_speed() { return 0; }
     
@@ -42,7 +45,7 @@ class Firmware {
         void next_tick_after(unsigned long wait); 
         void next_tick_at(unsigned long time, unsigned long rollover = ULONG_MAX) {
             next_tick = time;
-            rollover = rollover;
+            this->rollover = rollover;
         }
 
         virtual bool ready_for_tick();
@@ -57,7 +60,7 @@ class Firmware {
 
         void loop() {
             if (ready_for_tick()) {
-                loop();
+                tick();
             }
 
             else {

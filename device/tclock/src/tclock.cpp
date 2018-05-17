@@ -8,10 +8,7 @@ ToddlerClock::ToddlerClock(Logger *log, RGBPanel<4,8> *panel, RTC *rtc)
     this->rtc   = rtc;
 }
 
-ToddlerClock::~ToddlerClock() {
-    delete panel;
-    delete rtc;
-}
+ToddlerClock::~ToddlerClock() { }
 
 void ToddlerClock::blank_screen() {
     panel->set_brightness(5);

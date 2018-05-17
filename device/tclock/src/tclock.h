@@ -35,14 +35,14 @@ class ToddlerClock : public mysook::Firmware {
         };
 
         void blank_screen();
-        void color_screen(DateTime &d, uint8_t r, uint8_t g, uint8_t b, uint8_t brightness);
-        void color_screen(DateTime &d, ColorSetting &c) {
+        void color_screen(mysook::DateTime &d, uint8_t r, uint8_t g, uint8_t b, uint8_t brightness);
+        void color_screen(mysook::DateTime &d, ColorSetting &c) {
             color_screen(d, c.r, c.g, c.b, c.brightness);
         }
 
-        bool before_time(DateTime &check, TimeSetting &against);
-        bool before_transition_time(DateTime &check, TimeSetting &against);
-        ColorSetting make_transition_color(DateTime &now, ColorSetting &from, ColorSetting &to);
+        bool before_time(mysook::DateTime &check, TimeSetting &against);
+        bool before_transition_time(mysook::DateTime &check, TimeSetting &against);
+        ColorSetting make_transition_color(mysook::DateTime &now, ColorSetting &from, ColorSetting &to);
 
     public:
         ToddlerClock(mysook::Logger *log, mysook::RGBPanel<4,8> *panel, mysook::RTC *rtc);

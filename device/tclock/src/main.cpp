@@ -23,6 +23,17 @@ RTC_PCF8523 pfc8523;
 mysook::MC_RGBPanel<4,8> panel(&light);
 mysook::MC_RTC<RTC_PCF8523> rtc(&pfc8523);
 mysook::MC_Logger<Print> logger(&Serial);
+#else
+#include <iostream>
+#include <allegro5/allegro.h>
+#include <allegro5/allegro_primitives.h>
+#include <SimPanel.h>
+#include <SimRTC.h>
+#include <SimLogger.h>
+
+mysook::SimPanel<4,8> panel;
+mysook::SimRTC rtc;
+mysook::SimLogger logger;
 #endif//ARDUINO
 
 ToddlerClock tclock(&logger, &panel, &rtc);
@@ -39,6 +50,18 @@ void setup() {
     //pfc8523.adjust(DateTime(2018, 5, 15, 7, 0, 55));
 
     Serial.begin(57600);
+#else
+    if (!al_init()) {
+        std::cerr << "failed to initialize allegro" << std::endl;
+        exit(1);
+    }
+
+    if (!al_init_primitives_addon()) {
+        std::cerr << "failed to initialize primitives" << std::endl;
+        exit(1);
+    }
+
+    panel.initialize();
 #endif//ARDUINO
 
     tclock.setup();
@@ -47,3 +70,10 @@ void setup() {
 void loop() {
     tclock.loop();
 }
+
+#ifndef ARDUINO
+int main(int argc, char **argv) {
+    setup();
+    while (true) loop();
+}
+#endif//ARDUINO

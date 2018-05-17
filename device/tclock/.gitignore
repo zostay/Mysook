@@ -1,2 +1,5 @@
 .pioenvs
 .piolibdeps
+
+sim-tclock
+*.o
