@@ -62,6 +62,8 @@ void setup() {
     }
 
     panel.initialize();
+
+    //rtc.adjust_to(mysook::DateTime(2018, 5, 17, 7, 0, 55).unixtime());
 #endif//ARDUINO
 
     tclock.setup();
