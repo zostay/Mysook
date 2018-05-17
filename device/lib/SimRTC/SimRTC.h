@@ -13,7 +13,7 @@ protected:
 public:
     virtual DateTime now() { return DateTime(time(NULL) + offset); }
     
-    // allow some tweaking for debugging
+    // allow some tweaking for debugging/timezones/DST/etc.
     void set_offset(long offset) { this->offset = offset; }
     void reset_offset() { offset = 0l; }
     void adjust_to(time_t preferred_time) {

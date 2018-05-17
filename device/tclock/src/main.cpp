@@ -63,6 +63,7 @@ void setup() {
 
     panel.initialize();
 
+    rtc.set_offset(-5 * 60 * 60); // US/Central + DST
     //rtc.adjust_to(mysook::DateTime(2018, 5, 17, 7, 0, 55).unixtime());
 #endif//ARDUINO
 
