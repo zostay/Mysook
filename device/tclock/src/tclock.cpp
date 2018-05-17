@@ -19,10 +19,10 @@ void ToddlerClock::blank_screen() {
 void ToddlerClock::color_screen(DateTime &d, uint8_t r, uint8_t g, uint8_t b, uint8_t brightness) {
     panel->set_brightness(brightness);
 
-    int i = 0;
+    int stagger = d.day() % 2;
     for (int x = 0; x < 4; ++x) {
         for (int y = 0; y < 8; ++y) {
-            if (i++ % 2 == d.day() % 2) {
+            if ((x + y + stagger) % 2 == 0) {
                 //logf_ln("Set pixel (%d, %d) to (#%02x%02x%02x)", x, y, r, g, b);
                 panel->set_pixel(x, y, r, g, b);
             }
@@ -56,9 +56,9 @@ bool ToddlerClock::before_transition_time(DateTime &check, TimeSetting &against)
         t.h = 23;
     }
 
-    logf_ln("Checking if %02d:%02d < %02d:%02d",
-            check.hour(), check.minute(),
-            t.h, t.m);
+    // logf_ln("Checking if %02d:%02d < %02d:%02d",
+    //         check.hour(), check.minute(),
+    //         t.h, t.m);
 
     return before_time(check, t);
 }
