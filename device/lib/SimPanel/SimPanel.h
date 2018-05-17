@@ -7,6 +7,8 @@
 #include <inttypes.h>
 #include <math.h>
 
+#include <cstdio>
+
 namespace mysook {
 
 template <int W, int H>
@@ -27,7 +29,7 @@ const float log255 = log(255.0);
 
 template <int W, int H>
 void SimPanel<W,H>::initialize() {
-    display = al_create_display(W * 8, H * 8);
+    display = al_create_display(W * 80, H * 80);
 }
 
 template <int W, int H>
@@ -36,8 +38,8 @@ void SimPanel<W,H>::draw() {
 
     float brightness_coeff = log(this->brightness) / log255;
 
-    for (int cy = 0; cy < W; ++cy) {
-        for (int cx = 0; cx < H; ++cx) {
+    for (int cy = 0; cy < H; ++cy) {
+        for (int cx = 0; cx < W; ++cx) {
             uint8_t r, g, b;
             r = this->grid[cx][cy].r * brightness_coeff;
             g = this->grid[cx][cy].g * brightness_coeff;

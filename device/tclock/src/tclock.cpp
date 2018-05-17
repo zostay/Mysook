@@ -20,8 +20,8 @@ void ToddlerClock::color_screen(DateTime &d, uint8_t r, uint8_t g, uint8_t b, ui
     panel->set_brightness(brightness);
 
     int i = 0;
-    for (int y = 0; y < 8; ++y) {
-        for (int x = 0; x < 4; ++x) {
+    for (int x = 0; x < 4; ++x) {
+        for (int y = 0; y < 8; ++y) {
             if (i++ % 2 == d.day() % 2) {
                 //logf_ln("Set pixel (%d, %d) to (#%02x%02x%02x)", x, y, r, g, b);
                 panel->set_pixel(x, y, r, g, b);

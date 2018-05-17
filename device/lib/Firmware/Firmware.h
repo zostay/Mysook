@@ -3,6 +3,8 @@
 
 #ifdef ARDUINO
 #include <Arduino.h>
+#else
+#include <unistd.h>
 #endif//ARDUINO
 
 #include <climits>
@@ -28,11 +30,12 @@ class Firmware {
     
         virtual void start() = 0;
         virtual void tick() = 0;
-        virtual void idle() { }
 
 #ifdef ARDUINO
+        virtual void idle() { delay(1); }
         unsigned long get_micros() { return micros(); }
 #else
+        virtual void idle() { sleep(1); }
         unsigned long get_micros();
 #endif
 
