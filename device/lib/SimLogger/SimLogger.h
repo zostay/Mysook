@@ -7,7 +7,7 @@ namespace mysook {
 
 class SimLogger : public Logger {
 public:
-    virtual void write_log(const char *str) { std::cerr << str << std::endl; }
+    virtual void write_log(const char *str) { std::cerr << str; }
 };
 
 };
