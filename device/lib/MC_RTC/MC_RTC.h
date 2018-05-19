@@ -14,7 +14,7 @@ class MC_RTC : public RTC {
         MC_RTC(T *chip) { this->chip = chip; }
 
         virtual DateTime now() { 
-            return DateTime(DateTime.chip->now().unixtime()); 
+            return DateTime(chip->now().unixtime()); 
         }
 };
 
