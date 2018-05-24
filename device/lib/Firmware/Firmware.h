@@ -14,16 +14,16 @@ namespace mysook {
 
 class Firmware {
     protected:
-        Logger *log;
+        Logger &log;
 
         unsigned long rollover = ULONG_MAX;
         unsigned long previous_tick = 0;
         unsigned long next_tick = 0;
 
     public:
-        Firmware(Logger *log) { 
+        Firmware(Logger *log) : Firmware(*log) { }
+        Firmware(Logger &log) : log(log) { 
             next_tick = get_micros();
-			this->log = log; 
 		}
 
         virtual unsigned long tick_speed() { return 0; }
@@ -71,7 +71,7 @@ class Firmware {
             }
         }
 
-        virtual void write_log(const char *msg) { log->write_log(msg); }
+        virtual void write_log(const char *msg) { log.write_log(msg); }
 
         void logf_ln(const char *fmt...);
         void logf(const char *fmt...);

@@ -8,12 +8,13 @@ namespace mysook {
 template <class T>
 class MC_Logger : public Logger {
     protected:
-        T *serial;
+        T &serial;
 
     public:
-        MC_Logger(T *serial) { this->serial = serial; }
+        MC_Logger(T &serial) : serial(serial) { }
+        MC_Logger(T *serial) : MC_Logger(*serial) { }
 
-        virtual void write_log(const char *str) { serial->print(str); }
+        virtual void write_log(const char *str) { serial.print(str); }
 };
 
 };
