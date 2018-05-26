@@ -73,8 +73,19 @@ class Firmware {
 
         virtual void write_log(const char *msg) { log.write_log(msg); }
 
-        void logf_ln(const char *fmt...);
-        void logf(const char *fmt...);
+        void logf_ln(const char *fmt...) { 
+            va_list args;
+            va_start(args, fmt);
+            log.vlogf_ln(fmt, args);
+            va_end(args);
+        }
+
+        void logf(const char *fmt...) {
+            va_list args;
+            va_start(args, fmt);
+            log.vlogf(fmt, args);
+            va_end(args);
+        }
 };
 
 };
