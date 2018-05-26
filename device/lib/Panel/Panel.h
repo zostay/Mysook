@@ -36,14 +36,14 @@ public:
     virtual void set_bg(Color c) { bg = c; }
     virtual void set_bg(uint8_t r, uint8_t g, uint8_t b) { bg = Color(r, g, b); }
 
-    virtual void set_pixel() { set_pixel(cursor.get_x(), cursor.get_y(), fg); }
-    virtual void set_pixel_bg() { set_pixel(cursor.get_x(), cursor.get_y(), bg); }
-    virtual void set_pixel(int x, int y) { set_pixel(x, y, fg); }
-    virtual void set_pixel_bg(int x, int y) { set_pixel(x, y, fg); }
-    virtual void set_pixel(int x, int y, uint8_t r, uint8_t g, uint8_t b) {
-        set_pixel(x, y, Color(r, g, b));
+    virtual void put_pixel() { put_pixel(cursor.get_x(), cursor.get_y(), fg); }
+    virtual void put_pixel_bg() { put_pixel(cursor.get_x(), cursor.get_y(), bg); }
+    virtual void put_pixel(int x, int y) { put_pixel(x, y, fg); }
+    virtual void put_pixel_bg(int x, int y) { put_pixel(x, y, fg); }
+    virtual void put_pixel(int x, int y, uint8_t r, uint8_t g, uint8_t b) {
+        put_pixel(x, y, Color(r, g, b));
     }
-    virtual void set_pixel(int x, int y, Color c) = 0;
+    virtual void put_pixel(int x, int y, Color c) = 0;
 
     virtual void set_brightness(uint8_t brightness) = 0;
 
@@ -92,7 +92,7 @@ protected:
 
 public:
     virtual Color get_pixel(int x, int y) { return grid[x][y]; }
-    virtual void set_pixel(int x, int y, Color c) {
+    virtual void put_pixel(int x, int y, Color c) {
         grid[x][y] = c;
     }
 

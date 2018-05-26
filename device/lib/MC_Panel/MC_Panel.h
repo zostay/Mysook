@@ -13,7 +13,7 @@ class MC_RGBPanel : public RGBPanel<W, H> {
     public:
         MC_RGBPanel(M &panel) : panel(panel) { }
 
-        virtual void set_pixel(int x, int y, Color c) {
+        virtual void put_pixel(int x, int y, Color c) {
             panel.drawPixel(x, y, panel.Color(c.r, c.g, c.b));
         }
 
@@ -26,11 +26,8 @@ class MC_RGBPanel : public RGBPanel<W, H> {
         }
 
         virtual void put_char(unsigned char c, int x, int y, Color fg, Color bg) {
-            panel.drawChar(x, y, c, panel.Color(fg.r, fg.g, fg.b), panel.Color(bg.r, bg.g, bg.b), 1);
-            this->set_cursor(
-                panel.getCursorX(),
-                panel.getCursorY()
-            );
+            char text[2] = { c, '\0' };
+            put_text(text, x, y, fg, bg);
         }
 
         virtual void put_text(const char *text, int x, int y, Color fg, Color bg) {
@@ -40,6 +37,10 @@ class MC_RGBPanel : public RGBPanel<W, H> {
                 panel.Color(bg.r, bg.g, bg.b)
             );
             panel.print(text);
+            this->set_cursor(
+                panel.getCursorX(),
+                panel.getCursorY()
+            );
         }
 
         virtual void draw() {
