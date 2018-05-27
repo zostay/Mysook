@@ -26,7 +26,7 @@ mysook::MC_RGBPanel<12,6,Adafruit_DotStarMatrix> display(matrix);
 mysook::MC_Network network(logger);
 #endif//ARDUINO
 
-NameTag nametag(logger, display);
+NameTag nametag(logger, display, network);
 
 void setup() {
 #ifdef ARDUINO
@@ -50,6 +50,5 @@ void setup() {
 }
 
 void loop() {
-    network.connect();
     nametag.loop();
 }

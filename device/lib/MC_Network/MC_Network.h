@@ -7,7 +7,7 @@
 #include <WiFi.h>
 
 #define MAX_CONNECTION_MEMORY 10
-#define CONNECTION_TIMEOUT 30000
+#define CONNECTION_TIMEOUT 30000000ul
 
 namespace mysook {
 
@@ -50,9 +50,6 @@ protected:
         // nothing to do, we're connected
         if (connect_status) return;
 
-        // We're still waiting for the previous connect attempt to finish
-        if (timeout > millis()) return;
-
         // unable to connect because we are not configured
         if (conns == 0) {
             logger.logf_ln("E [network] No SSIDs configured. Connection is impossible.");
@@ -88,7 +85,7 @@ protected:
 
         // A network was found, pick it and connect
         else {
-            timeout = millis() + CONNECTION_TIMEOUT;
+            timeout = micros() + CONNECTION_TIMEOUT;
             current = best_conn;
             begin_connection();
         }
@@ -134,6 +131,12 @@ public:
         memory[conns].password = password;
         conns++;
     }
+
+    virtual bool ready_for_tick(unsigned long now) {
+        return now >= timeout;
+    }
+
+    virtual void tick() { connect(); }
         
     void connect() { find_connection(); }
 

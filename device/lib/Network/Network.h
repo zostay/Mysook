@@ -1,14 +1,19 @@
 #ifndef __NETWORK_H
 #define __NETWORK_H
 
+#include <Firmware.h>
+
 namespace mysook {
 
-class Network {
+class Network : public Ticking {
 public:
 	virtual ~Network() { }
 
     virtual uint8_t signal_strength() { return 127; }
     virtual bool connected() { return true; }
+
+    virtual bool ready_for_tick(unsigned long now) { return false; }
+    virtual void tick() { }
 
     // These are mostly here to give a sense of the scale I am aiming for.
     // Each of these roughly corresponds to 1-5 bars you'd see in a wifi signal
