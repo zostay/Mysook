@@ -35,6 +35,8 @@ void NameTag::start() {
         matrix.draw();
         delay(500);
     }
+
+    web_server.begin();
 }
 
 void NameTag::tick() {

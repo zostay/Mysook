@@ -24,8 +24,9 @@ private:
 
 public:
     NameTag(mysook::Logger &log, mysook::RGBPanel<12,6> &matrix, mysook::Network &network) 
-    : Firmware(log), matrix(matrix), network(network), web_server(dispatcher, log) { 
+    : Firmware(log), matrix(matrix), network(network), web_server(network, dispatcher, log) { 
         this->add_pre_ticker(&network);
+        this->add_pre_ticker(&web_server);
     }
 
     virtual bool handle_web_request(mysook::Request &req, mysook::Response &res) {

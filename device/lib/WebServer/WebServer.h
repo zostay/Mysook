@@ -188,8 +188,11 @@ public:
     Request(String &method, String &path, String &body) : _method(method), _path(path), Message(body) { }
     Request(String &method, String &path, Message &msg) : _method(method), _path(path), Message(msg) { }
 
-    String &path() { return _path; }
-    String &method() { return _method; }
+    const String &path() const { return _path; }
+    void path(const String &path) { _path = path; }
+
+    const String &method() const { return _method; }
+    void method(const String &method) { _method = method; }
 
     Request &operator= (const Request &rhs) {
         Message::operator= (rhs);
@@ -268,11 +271,15 @@ enum RequestState {
 
 class WebServer : public Ticking {
 protected:
+    Network &network;
     WiFiServer server;
     const WebDispatcher &dispatcher;
     Logger &log;
 
+    bool start = false;
+
     WiFiClient clients[MAX_CLIENTS];
+    bool active[MAX_CLIENTS];
     Request requests[MAX_CLIENTS];
     String bufs[MAX_CLIENTS];
     RequestState states[MAX_CLIENTS];
@@ -283,13 +290,15 @@ protected:
 
         for (int i = 0; i < MAX_CLIENTS; ++i) {
             if (!clients[i]) {
+                active[i] = true;
                 clients[i] = client;
-                log.logf_ln("I [webserver] New client connected.");
+                log.logf_ln("I [webserver] New client connected (%d)", i);
                 return;
             }
         }
         
         // Too many clients if we get here. Shouldn't happen, right?
+        log.logf_ln("E [webserver] Too many clients connected. Dropping client.");
         client.stop();
     }
 
@@ -297,18 +306,22 @@ protected:
     const String BAD_REQUEST = "Bad Request";
     const String BAD_METHOD  = "Bad Method";
 
+    const String GET  = "GET";
+    const String POST = "POST";
+
     void handle_request() {
         for (int i = 0; i < MAX_CLIENTS; ++i) {
             auto &client = clients[i];
 
             // Connection is closed, nothing left to do here.
-            if (!client.connected()) {
+            if (active[i] && !client.connected()) {
                 reset(i);
                 continue;
             }
 
             while (client.available()) {
                 char c = client.read();
+                log.logf("%c", c);
 
                 bool bad_request = false;
                 bool bad_method = false;
@@ -316,25 +329,39 @@ protected:
                 switch (states[i]) {
                 case REQ_STATE_START:
                     if (c == '\n') {
-                        if (!bufs[i].startsWith("HTTP/1.")) bad_request = true;
-                        if (bufs[i][7] != '0' && bufs[i][7] != '1') bad_request = true;
-
                         int path_start = -1;
-                        if (bufs[i].substring(8).startsWith(" GET ")) {
-                            requests[i].method() = "GET";
-                            path_start = 13;
+                        if (bufs[i].startsWith("GET ")) {
+                            requests[i].method(GET);
+                            path_start = 4;
 
+                            //log.logf_ln("D [webserver] method GET (%s) is ok", requests[i].method().c_str());
                         }
-                        else if (bufs[i].substring(8).startsWith(" POST ")) {
-                            requests[i].method() = "POST";
-                            path_start = 14;
+                        else if (bufs[i].startsWith("POST ")) {
+                            requests[i].method(POST);
+                            path_start = 5;
+
+                            //log.logf_ln("D [webserver] method POST (%s) is ok", requests[i].method().c_str());
                         }
                         else {
                             bad_method = true;
+
+                            //log.logf_ln("D [webserver] method is bad");
                         }
 
-                        if (path_start > 0)
-                            requests[i].path() = bufs[i].substring(path_start + 1);
+                        int path_end = bufs[i].indexOf(' ', path_start);
+
+                        if (path_start > 0 && path_end > 0) {
+                            String path = bufs[i].substring(path_start, path_end);
+                            requests[i].path(path);
+                        }
+
+                        //log.logf_ln("D [webserver] path (%s) is ok? %d", requests[i].path().c_str(), !bad_request);
+
+                        String http_version = bufs[i].substring(path_end + 1);
+                        if (!http_version.startsWith("HTTP/1.")) bad_request = true;
+                        //log.logf_ln("D [webserver] HTTP version (%s) prefix is ok? %d", http_version.c_str(), !bad_request);
+                        if (http_version[7] != '0' && http_version[7] != '1') bad_request = true;
+                        //log.logf_ln("D [webserver] HTTP version (%s) suffix is ok? %d", http_version.c_str(), !bad_request);
 
                         bufs[i] = String();
 
@@ -348,6 +375,7 @@ protected:
                 case REQ_STATE_HEADER:
                     if (c == '\n') {
                         if (bufs[i].length() == 0) {
+                            log.logf_ln("D [webserver] headers are done");
                             states[i] = REQ_STATE_BODY;
                         }
                         else {
@@ -360,13 +388,16 @@ protected:
                                 value.trim();
 
                                 if (name.length() > 0) {
+                                    log.logf_ln("D [webserver] good header %s=%s", name.c_str(), value.c_str());
                                     requests[i].header(name, value);
                                 }
                                 else {
+                                    log.logf_ln("D [webserver] bad header %s=%s", name.c_str(), value.c_str());
                                     bad_request = true;
                                 }
                             }
                             else {
+                                log.logf_ln("D [webserver] bad header line %s", bufs[i].c_str());
                                 bad_request = true;
                             }
                         }
@@ -404,6 +435,9 @@ protected:
     }
 
     void reset(int i) {
+        log.logf_ln("I [webserver] Client disconnected (%d)", i);
+
+        active[i]   = false;
         clients[i]  = WiFiClient();
         requests[i] = Request();
         bufs[i]     = String();
@@ -411,6 +445,8 @@ protected:
     }
 
     void respond_with(int i, int code, const String &msg) {
+        log.logf_ln("I [webserver] Response (%d) %d %s", i, code, msg.c_str());
+
         clients[i].print("HTTP/1.0 ");
         clients[i].print(code);
         clients[i].print(" ");
@@ -423,6 +459,8 @@ protected:
     }
 
     void respond_with(int i, Response &res) {
+        log.logf_ln("I [webserver] Response (%d) %d %s", i, res.status_code(), res.status_message().c_str());
+
         clients[i].print(res.toString());
 
         reset(i);
@@ -438,19 +476,41 @@ protected:
         }
     }
 
+    void ensure_started() {
+        if (!server) {
+            server.begin();
+            log.logf_ln("I [webserver] HTTP server listening on port 80.");
+        }
+    }
+
+    void ensure_stopped() {
+        if (server) {
+            log.logf_ln("W [webserver] HTTP server stopping due to loss of network.");
+            server.end();
+        }
+    }
+
 public:
-    WebServer(WebDispatcher &dispatcher, Logger &log) : server(80, MAX_CLIENTS), dispatcher(dispatcher), log(log) { 
+    WebServer(Network &network, WebDispatcher &dispatcher, Logger &log) : network(network), server(80, MAX_CLIENTS), dispatcher(dispatcher), log(log) { 
         for (int i = 0; i < MAX_CLIENTS; ++i)
             reset(i);
     }
 
     void begin() {
-        server.begin();
-        log.logf_ln("I [webserver] HTTP server listening on port 80.");
+        start = true;
+    }
+
+    void end() {
+        start = false;
     }
 
     virtual bool ready_for_tick(unsigned long now) { return true; }
     virtual void tick() {
+        if (start && network.connected())
+            ensure_started();
+        else 
+            ensure_stopped();
+
         accept_client();
         handle_request();
     }
