@@ -1,9 +1,12 @@
 #ifndef __LOGGER_H
 #define __LOGGER_H
 
+#include <functional>
 #include <cstdarg>
 
 namespace mysook {
+
+typedef std::function<unsigned long()> GetMicrosFunction;
 
 class Logger {
 public:

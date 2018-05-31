@@ -42,9 +42,12 @@ protected:
     }
 
 public:
-    Message() : _body("") { }
-    Message(const char *body) : _body(body) { }
-    Message(String &body) : _body(body) { }
+    Message() : Message("") { }
+    Message(String &body) : Message(body.c_str()) { }
+    Message(const char *body) : _body(body) { 
+        _headers = new Header[header_buf];
+    }
+
     Message(Message &m) : _body(m._body), header_buf(m.header_buf), _header_count(m._header_count) {
         _headers = new Header[header_buf];
         for (int i = 0; i < _header_count; ++i) {
@@ -113,8 +116,8 @@ public:
 
         stretch_headers();
 
-        _headers[_header_count++].name = name;
-        _headers[_header_count-1].value = value;
+        _headers[_header_count].name    = name;
+        _headers[_header_count++].value = value;
     }
 
     const String &header_value(int i) const {
@@ -375,8 +378,16 @@ protected:
                 case REQ_STATE_HEADER:
                     if (c == '\n') {
                         if (bufs[i].length() == 0) {
-                            log.logf_ln("D [webserver] headers are done");
-                            states[i] = REQ_STATE_BODY;
+                            //log.logf_ln("D [webserver] headers are done");
+                            if (requests[i].method() == GET || requests[i].content_length() == 0) {
+                                handle_request(i);
+                            }
+                            else if (requests[i].content_length() > 0) {
+                                states[i] = REQ_STATE_BODY;
+                            }
+                            else {
+                                bad_request = true;
+                            }
                         }
                         else {
                             int colon = bufs[i].indexOf(':');
@@ -388,16 +399,16 @@ protected:
                                 value.trim();
 
                                 if (name.length() > 0) {
-                                    log.logf_ln("D [webserver] good header %s=%s", name.c_str(), value.c_str());
+                                    //log.logf_ln("D [webserver] good header %s=%s", name.c_str(), value.c_str());
                                     requests[i].header(name, value);
                                 }
                                 else {
-                                    log.logf_ln("D [webserver] bad header %s=%s", name.c_str(), value.c_str());
+                                    //log.logf_ln("D [webserver] bad header %s=%s", name.c_str(), value.c_str());
                                     bad_request = true;
                                 }
                             }
                             else {
-                                log.logf_ln("D [webserver] bad header line %s", bufs[i].c_str());
+                                //log.logf_ln("D [webserver] bad header line %s", bufs[i].c_str());
                                 bad_request = true;
                             }
                         }
@@ -413,6 +424,7 @@ protected:
                     int cl = requests[i].content_length();
                     if (cl >= 0) {
                         if (cl <= bufs[i].length()) {
+                            //log.logf_ln("D [webserver] handling POST with POSTDATA %s", bufs[i].c_str());
                             requests[i].body(bufs[i].substring(0, cl));
                             handle_request(i);
                         }
@@ -421,6 +433,7 @@ protected:
                         }
                     }
                     else {
+                        //log.logf_ln("D [webserver] bad stuff");
                         bad_request = true;
                     }
                     break;
