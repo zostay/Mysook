@@ -21,7 +21,7 @@ Adafruit_DotStarMatrix matrix = Adafruit_DotStarMatrix(
         DS_MATRIX_ROWS + DS_MATRIX_PROGRESSIVE,
         DOTSTAR_BGR);
 
-mysook::MC_Logger<Print> logger(Serial);
+mysook::MC_Logger<Print> logger(&micros, Serial);
 mysook::MC_RGBPanel<12,6,Adafruit_DotStarMatrix> display(matrix);
 mysook::MC_Network network(logger);
 #endif//ARDUINO
