@@ -70,27 +70,51 @@ public:
 
 #define MAX_TICKERS 20
 
+typedef Ticking *TickerPtr;
+
+class TickArray {
+protected:
+    TickerPtr *tickers;
+    int ticker_count;
+    int ticker_capacity;
+
+    void stretch(int by = 5) {
+        ticker_capacity += by;
+        TickerPtr *new_tickers = new TickerPtr[ticker_capacity];
+
+        for (int i = 0; i < ticker_count; ++i)
+            new_tickers[i] = tickers[i];
+
+        delete[] tickers;
+        tickers = new_tickers;
+    }
+
+public:
+    TickArray(int capacity = 5) 
+    : tickers(new TickerPtr[capacity]), ticker_count(0), ticker_capacity(capacity) { }
+
+    virtual ~TickArray() { delete[] tickers; }
+
+    void run(unsigned long now) {
+        for (int i = 0; i < ticker_count; ++i) 
+            if (tickers[i]->ready_for_tick(now))
+                tickers[i]->tick();
+    }
+
+    void add(TickerPtr ticker) {
+        if (ticker_count >= ticker_capacity)
+            stretch();
+
+        tickers[ticker_count++] = ticker;
+    }
+};
+
 class Firmware : public TickingVariableTimer {
 protected:
     Logger &log;
 
-    Ticking *pre_tickers[MAX_TICKERS];
-    int pre_ticker_count = 0;
-
-    Ticking *post_tickers[MAX_TICKERS];
-    int post_ticker_count = 0;
-
-    void run_pre_ticks(unsigned long now) {
-        for (Ticking **t = pre_tickers; t < t + pre_ticker_count; t++)
-            if ((*t)->ready_for_tick(now))
-                (*t)->tick();
-    }
-
-    void run_post_ticks(unsigned long now) {
-        for (Ticking **t = post_tickers; t < t + post_ticker_count; t++)
-            if ((*t)->ready_for_tick(now))
-                (*t)->tick();
-    }
+    TickArray pre_tickers;
+    TickArray post_tickers;
 
 public:
     Firmware(Logger *log) : Firmware(*log) { }
@@ -99,21 +123,11 @@ public:
     }
 
     void add_pre_ticker(Ticking *ticker) {
-        if (pre_ticker_count >= MAX_TICKERS) {
-            logf_ln("E [firmware] Too many pre-tickers registered");
-            return;
-        }
-
-        pre_tickers[pre_ticker_count++];
+        pre_tickers.add(ticker);
     }
 
     void add_post_ticker(Ticking *ticker) {
-        if (post_ticker_count >= MAX_TICKERS) {
-            logf_ln("E [firmware] Too many post-tickers registered");
-            return;
-        }
-
-        post_tickers[post_ticker_count++];
+        post_tickers.add(ticker);
     }
 
     virtual void start() = 0;
@@ -129,16 +143,16 @@ public:
         start();
 
         unsigned long now = get_micros();
-        run_pre_ticks(now);
+        pre_tickers.run(now);
         if (ready_for_tick(now)) {
             tick();
         }
-        run_post_ticks(now);
+        post_tickers.run(now);
     }
 
     void loop() {
         unsigned long now = get_micros();
-        run_pre_ticks(now);
+        pre_tickers.run(now);
         if (ready_for_tick(now)) {
             tick();
         }
@@ -146,7 +160,7 @@ public:
         else {
             idle();
         }
-        run_post_ticks(now);
+        post_tickers.run(now);
     }
 
     virtual void write_log(const char *msg) { log.write_log(msg); }
