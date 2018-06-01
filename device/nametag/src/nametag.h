@@ -9,6 +9,8 @@
 #include <Network.h>
 #include <WebServer.h>
 
+#include "vm.h"
+
 using std::placeholders::_1;
 using std::placeholders::_2;
 
@@ -18,15 +20,18 @@ private:
     mysook::Network &network;
     mysook::WebServer web_server;
 
+    VM vm;
+
     int x = matrix.panel_width();
 
     mysook::WebDispatcher dispatcher = std::bind(&NameTag::handle_web_request, this, _1, _2);
 
 public:
     NameTag(mysook::Logger &log, mysook::RGBPanel<12,6> &matrix, mysook::Network &network) 
-    : Firmware(log), matrix(matrix), network(network), web_server(network, dispatcher, log) { 
+    : Firmware(log), matrix(matrix), network(network), web_server(network, dispatcher, log), vm(matrix) { 
         this->add_pre_ticker(&network);
         this->add_pre_ticker(&web_server);
+        this->add_post_ticker(&vm);
     }
 
     virtual bool handle_web_request(mysook::Request &req, mysook::Response &res) {
