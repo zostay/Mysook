@@ -50,7 +50,7 @@ public:
     virtual void fill_screen() { fill_screen(fg); }
     virtual void fill_screen_bg() { fill_screen(bg); }
     virtual void fill_screen(Color c) = 0;
-    void fill_screen(uint8_t r, uint8_t g, uint8_t b) {
+    virtual void fill_screen(uint8_t r, uint8_t g, uint8_t b) {
         fill_screen(Color(r, g, b));
     }
 

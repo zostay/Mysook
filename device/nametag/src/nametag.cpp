@@ -3,8 +3,19 @@
 #endif//ARDUINO
 #include <Color.h>
 #include "nametag.h"
+#include "ops.h"
 
 char message[] = "Hello my name is Sterling!";
+
+uint32_t basic_program[] = {
+    OP_SUB, PROGRAM_MAIN,
+    OP_PUSH, 10, OP_URGENCY,
+    OP_PUSH, 0xFF0000, OP_FOREGROUND, OP_FILL,
+    OP_PUSH, 0x00FF00, OP_FOREGROUND, OP_FILL,
+    OP_PUSH, 0x0000FF, OP_FOREGROUND, OP_FILL,
+    OP_GOTO, PROGRAM_MAIN,
+    OP_HALT, OP_HALT,
+};
 
 const mysook::Color primaryColors[] = {
     mysook::Color(0, 0, 255),

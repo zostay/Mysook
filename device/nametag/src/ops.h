@@ -4,21 +4,32 @@
 
 #include <functional>
 #include <map>
+#include <stdexcept>
 
-template <int W, int H, class P>
-class OpCodes<W,H,P> {
+template <int W, int H>
+class VM;
+
+template <int W, int H>
+class OpCodes {
+public:
+    typedef VM<W,H> vm_type;
+    typedef std::function<void(vm_type&)> op_code;
+
 private:
-    typedef std::function<void(VM<W,H,P>)> op_code;
-    std::map<uint32_t, op_code*> ops;
+    std::map<uint32_t, op_code> ops;
 
 public:
     OpCodes();
 
-    op_code *operator[] (uint32_t op) {
+    op_code at(uint32_t op) {
+        return ops.at(op);
+    }
+
+    op_code operator[] (uint32_t op) {
         try {
             return ops.at(op);
         }
-        catch (out_of_bounds e) {
+        catch (std::out_of_range e) {
             return 0;
         }
     }
@@ -89,8 +100,108 @@ enum VMRegister {
     REG_URGENCY          = 0x0001,
     REG_BRIGHTNESS       = 0x0002,
     REG_FOREGROUND_COLOR = 0x0003,
-    REG_MARK             = 0x0005,
+    REG_BACKGROUND_COLOR = 0x0004,
+    REG_MASK_COLOR       = 0x0005,
+    REG_MARK             = 0x0006,
+    REG_USER0            = 0x0010,
+    REG_USER239          = 0x00FF,
 };
+
+template <int W, int H> void op_sub(VM<W,H> &);
+template <int W, int H> void op_return(VM<W,H> &);
+template <int W, int H> void op_goto(VM<W,H> &);
+template <int W, int H> void op_gosub(VM<W,H> &);
+template <int W, int H> void op_tick(VM<W,H> &);
+template <int W, int H> void op_tick_mode(VM<W,H> &);
+template <int W, int H> void op_noop(VM<W,H> &);
+template <int W, int H> void op_cmp(VM<W,H> &);
+template <int W, int H> void op_cmpsub(VM<W,H> &);
+template <int W, int H> void op_eq(VM<W,H> &);
+template <int W, int H> void op_lt(VM<W,H> &);
+template <int W, int H> void op_le(VM<W,H> &);
+template <int W, int H> void op_gt(VM<W,H> &);
+template <int W, int H> void op_ge(VM<W,H> &);
+template <int W, int H> void op_ne(VM<W,H> &);
+template <int W, int H> void op_add(VM<W,H> &);
+template <int W, int H> void op_min(VM<W,H> &);
+template <int W, int H> void op_mul(VM<W,H> &);
+template <int W, int H> void op_div(VM<W,H> &);
+template <int W, int H> void op_mod(VM<W,H> &);
+template <int W, int H> void op_and(VM<W,H> &);
+template <int W, int H> void op_or(VM<W,H> &);
+template <int W, int H> void op_not(VM<W,H> &);
+template <int W, int H> void op_rand(VM<W,H> &);
+template <int W, int H> void op_width(VM<W,H> &);
+template <int W, int H> void op_height(VM<W,H> &);
+template <int W, int H> void op_set(VM<W,H> &);
+template <int W, int H> void op_get(VM<W,H> &);
+template <int W, int H> void op_urgency(VM<W,H> &);
+template <int W, int H> void op_brightness(VM<W,H> &);
+template <int W, int H> void op_foreground(VM<W,H> &);
+template <int W, int H> void op_fill(VM<W,H> &);
+template <int W, int H> void op_pixel(VM<W,H> &);
+template <int W, int H> void op_push(VM<W,H> &);
+template <int W, int H> void op_pop(VM<W,H> &);
+template <int W, int H> void op_dup(VM<W,H> &);
+template <int W, int H> void op_swap(VM<W,H> &);
+template <int W, int H> void op_mark(VM<W,H> &);
+template <int W, int H> void op_fill_rows(VM<W,H> &);
+template <int W, int H> void op_mask_rows(VM<W,H> &);
+template <int W, int H> void op_fill_columns(VM<W,H> &);
+template <int W, int H> void op_mask_columns(VM<W,H> &);
+template <int W, int H> void op_fill_bits(VM<W,H> &);
+template <int W, int H> void op_mask_bits(VM<W,H> &);
+template <int W, int H> void op_halt(VM<W,H> &);
+
+template <int W, int H>
+OpCodes<W,H>::OpCodes() {
+
+    ops[OP_SUB]          = op_sub<W,H>;
+    ops[OP_RETURN]       = op_return<W,H>;
+    ops[OP_GOTO]         = op_goto<W,H>;
+    ops[OP_GOSUB]        = op_gosub<W,H>;
+    ops[OP_TICK]         = op_tick<W,H>;
+    ops[OP_TICK_MODE]    = op_tick_mode<W,H>;
+    ops[OP_NOOP]         = op_noop<W,H>;
+    ops[OP_CMP]          = op_cmp<W,H>;
+    ops[OP_CMPSUB]       = op_cmpsub<W,H>;
+    ops[OP_EQ]           = op_eq<W,H>;
+    ops[OP_LT]           = op_lt<W,H>;
+    ops[OP_LE]           = op_le<W,H>;
+    ops[OP_GT]           = op_gt<W,H>;
+    ops[OP_GE]           = op_ge<W,H>;
+    ops[OP_NE]           = op_ne<W,H>;
+    ops[OP_ADD]          = op_add<W,H>;
+    ops[OP_MIN]          = op_min<W,H>;
+    ops[OP_MUL]          = op_mul<W,H>;
+    ops[OP_DIV]          = op_div<W,H>;
+    ops[OP_MOD]          = op_mod<W,H>;
+    ops[OP_AND]          = op_and<W,H>;
+    ops[OP_OR]           = op_or<W,H>;
+    ops[OP_NOT]          = op_not<W,H>;
+    ops[OP_RAND]         = op_rand<W,H>;
+    ops[OP_WIDTH]        = op_width<W,H>;
+    ops[OP_HEIGHT]       = op_height<W,H>;
+    ops[OP_SET]          = op_set<W,H>;
+    ops[OP_GET]          = op_get<W,H>;
+    ops[OP_URGENCY]      = op_urgency<W,H>;
+    ops[OP_BRIGHTNESS]   = op_brightness<W,H>;
+    ops[OP_FOREGROUND]   = op_foreground<W,H>;
+    ops[OP_FILL]         = op_fill<W,H>;
+    ops[OP_PIXEL]        = op_pixel<W,H>;
+    ops[OP_PUSH]         = op_push<W,H>;
+    ops[OP_POP]          = op_pop<W,H>;
+    ops[OP_DUP]          = op_dup<W,H>;
+    ops[OP_SWAP]         = op_swap<W,H>;
+    ops[OP_MARK]         = op_mark<W,H>;
+    ops[OP_FILL_ROWS]    = op_fill_rows<W,H>;
+    ops[OP_MASK_ROWS]    = op_mask_rows<W,H>;
+    ops[OP_FILL_COLUMNS] = op_fill_columns<W,H>;
+    ops[OP_MASK_COLUMNS] = op_mask_columns<W,H>;
+    ops[OP_FILL_BITS]    = op_fill_bits<W,H>;
+    ops[OP_MASK_BITS]    = op_mask_bits<W,H>;
+    ops[OP_HALT]         = op_halt<W,H>;
+}
 
 #endif//__VM_OPS_H
 

@@ -43,6 +43,9 @@ protected:
                 connect_status = false;
                 logger.logf_ln("W [network] Disconnected from %s", current->ssid);
                 break;
+
+            default:
+                break;
         }
     }
 
