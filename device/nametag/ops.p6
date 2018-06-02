@@ -54,6 +54,8 @@ enum VMOp (
     OP_URGENCY         => 0x0091,
     OP_BRIGHTNESS      => 0x0092,
     OP_FOREGROUND      => 0x0093,
+    OP_BACKGROUND      => 0x0094,
+    OP_MASKGROUND      => 0x0095,
 
     OP_FILL            => 0x00A1,
     OP_FILL_ROWS       => 0x20A1,
@@ -78,7 +80,7 @@ enum VMRegister (
     REG_BRIGHTNESS         => 2,
     REG_FOREGROUND_COLOR   => 3,
     REG_BACKGROUND_COLOR   => 4,
-    REG_MASK_COLOR         => 5,
+    REG_MASKGROUND_COLOR   => 5,
     REG_MARK               => 6,
     REG_USER0              => 16,
     REG_USER239            => 255,

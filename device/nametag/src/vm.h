@@ -6,6 +6,7 @@
 
 #include <Color.h>
 #include <Firmware.h>
+#include <Logger.h>
 #include <Panel.h>
 
 #include "ops.h"
@@ -22,7 +23,7 @@ template <int W, int H>
 void op_mask_rows(VM<W,H> &);
 
 template <int W, int H>
-class VM : public mysook::RGBPanel<W, H>, public mysook::Ticking {
+class VM : public mysook::RGBPanel<W, H>, public mysook::TickingVariableTimer {
 protected:
     const uint32_t *program;
     uint32_t stack[STACK_SIZE];
@@ -31,6 +32,7 @@ protected:
     std::map<uint32_t, int> call_index;
     OpCodes<W,H> op_codes;
 
+    mysook::Logger &log;
     mysook::RGBPanel<W, H> &panel;
     uint32_t _panel_bitmask[H];
 
@@ -47,19 +49,25 @@ protected:
     friend void op_mask_rows<W,H>(VM<W,H> &);
     friend void op_mask_bits<W,H>(VM<W,H> &);
 
+    unsigned long hertz(uint32_t urgency) { return 50000ul * urgency; }
+    unsigned long _tick_speed = 50000ul;
+
 public:
-    VM(mysook::RGBPanel<W, H> &panel, const uint32_t *program, uint32_t start);
+    VM(mysook::Logger &log, mysook::RGBPanel<W, H> &panel, const uint32_t *program, uint32_t start);
 
     const int width() const { return W; }
     const int height() const { return H; }
 
-    virtual bool ready_for_tick(unsigned long now) { return true; }
+    virtual unsigned long tick_speed() { return _tick_speed; }
     virtual void tick() { tick_exec(); }
 
     uint32_t pop();
     void push(uint32_t v);
     
-    void halt() { halted = true; }
+    void halt() { 
+        log.logf_ln("W [vm] HALT!");
+        halted = true; 
+    }
 
     int get_sub(uint32_t sub) { 
         try {
@@ -70,7 +78,7 @@ public:
         }
     }
 
-    uint16_t step() { 
+    uint32_t step() { 
         if (halted) return OP_HALT;
         return program[ program_ptr++ ]; 
     }
@@ -90,15 +98,36 @@ public:
     bool has_ticked() { return _tick; }
 
     uint32_t get_register(int reg) {
+        if (reg < 0 || reg > 255) {
+            // PANIC!
+            log.logf_ln("E [vm] get illegal register %d", reg);
+            halt();
+            return 0;
+        }
+
         return registers[reg];
     }
 
     void set_register(int reg, uint32_t val) {
+        if (reg < 0 || reg > 255) {
+            // PANIC!
+            log.logf_ln("E [vm] set illegal register %d", reg);
+            halt();
+            return;
+        }
+
         registers[reg] = val;
 
         switch (reg) {
+        case REG_URGENCY:
+            _tick_speed = hertz(val);
+            break;
+
         case REG_BRIGHTNESS: 
-            set_brightness(val); 
+            {
+                uint8_t capped = val > 50 ? 50 : val;
+                set_brightness(capped); 
+            }
             break;
 
         case REG_FOREGROUND_COLOR: 
@@ -120,17 +149,23 @@ public:
     using mysook::RGBPanel<W,H>::put_char;
     using mysook::RGBPanel<W,H>::put_text;
 
+    using mysook::RGBPanel<W,H>::set_fg;
+    using mysook::RGBPanel<W,H>::set_bg;
+
     virtual void put_pixel(int x, int y, mysook::Color c) { panel.put_pixel(x, y, c); }
     virtual void set_brightness(uint8_t brightness) { panel.set_brightness(brightness); }
-    virtual void fill_screen(mysook::Color c) { panel.fill_screen(c); }
+    virtual void fill_screen(mysook::Color c) { 
+        log.logf_ln("D [vm] filling screen (%d, %d, %d)", c.r, c.g, c.b);
+        panel.fill_screen(c); 
+    }
     virtual void put_char(unsigned char c, int x, int y, mysook::Color fg, mysook::Color bg) { panel.put_char(c, x, y, fg, bg); }
     virtual void put_text(const char *t, int x, int y, mysook::Color fg, mysook::Color bg) { panel.put_text(t, x, y, fg, bg); }
     virtual void draw();
 };
 
 template <int W, int H>
-VM<W,H>::VM(mysook::RGBPanel<W,H> &panel, const uint32_t *program, uint32_t start) 
-: panel(panel), program(program) { 
+VM<W,H>::VM(mysook::Logger &log, mysook::RGBPanel<W,H> &panel, const uint32_t *program, uint32_t start) 
+: log(log), panel(panel), program(program) { 
 
     scan_subs();
 
@@ -145,7 +180,15 @@ VM<W,H>::VM(mysook::RGBPanel<W,H> &panel, const uint32_t *program, uint32_t star
     registers[REG_URGENCY]          = 10;
     registers[REG_BRIGHTNESS]       = 30;
 
+    _tick_speed = hertz(10);
+    set_brightness(30);
+
     registers[REG_FOREGROUND_COLOR] = 0xFFFFFF; // white
+    registers[REG_BACKGROUND_COLOR] = 0x000000; // black
+    registers[REG_MASKGROUND_COLOR] = 0x000000; // black
+
+    set_fg(mysook::Color(255, 255, 255));
+    set_bg(mysook::Color(0, 0, 0));
 
     registers[REG_MARK]             = 0;
 }
@@ -190,6 +233,7 @@ void VM<W,H>::step_exec() {
             }
             catch (std::out_of_range e) {
                 // PANIC!
+                log.logf_ln("E [vm] invalid opcode %d", s);
                 halt();
             }
         }
@@ -217,6 +261,7 @@ void VM<W,H>::step_exec() {
 
     default:
         // PANIC!
+        log.logf_ln("E [vm] invalid tick mode %d", mode);
         halt();
         return;
     }
@@ -238,12 +283,15 @@ void VM<W,H>::tick_exec() {
 
     reset_tick();
     while (!has_ticked()) step_exec();
+
+    log.logf_ln("I [vm] Tick!");
 }
 
 template <int W, int H>
 uint32_t VM<W,H>::pop() {
     if (stack_ptr <= 0) {
         // PANIC!
+        log.logf_ln("E [vm] stack underflow");
         halt();
         return 0;
     }
@@ -257,6 +305,7 @@ template <int W, int H>
 void VM<W,H>::push(uint32_t v) {
     if (stack_ptr >= STACK_SIZE) {
         // PANIC!
+        log.logf_ln("E [vm] stack overflow");
         halt();
     }
     else {
@@ -269,6 +318,7 @@ template <int W, int H>
 mysook::Color VM<W,H>::get_register_color(int reg) {
     if (reg < 0 || reg > 255) {
         // PANIC!
+        log.logf_ln("E [vm] get illegal color register %d", reg);
         halt();
         return mysook::Color(0, 0, 0);
     }
@@ -279,6 +329,8 @@ mysook::Color VM<W,H>::get_register_color(int reg) {
     uint8_t g = (color & 0x00FF00) >> 8;
     uint8_t b = (color & 0x0000FF);
 
+    log.logf_ln("D [vm] 0x%06X -> (%d, %d, %d)", color, r, g, b);
+
     return mysook::Color(r, g, b);
 }
 
@@ -286,21 +338,24 @@ template <int W, int H>
 void VM<W,H>::set_register_color(int reg, mysook::Color val) {
     if (reg < 0 || reg > 255) {
         // PANIC!
+        log.logf_ln("E [vm] set illegal color register %d", reg);
         halt();
         return; 
     }
 
     uint32_t color = 0;
-    color |= val.r() << 16;
-    color |= val.g() << 8;
-    color |= val.b();
+    color |= val.r << 16;
+    color |= val.g << 8;
+    color |= val.b;
+
+    log.logf_ln("D [vm] (%d, %d, %d) -> 0x%06X", val.r, val.g, val.b, color);
 
     set_register(reg, color);
 }
 
 template <int W, int H>
 void VM<W,H>::draw() { 
-    mysook::Color mask_color = get_register_color(REG_MASK_COLOR);
+    mysook::Color mask_color = get_register_color(REG_MASKGROUND_COLOR);
 
     for (int y = 0; y < H; y++) {
         uint32_t row_mask = _panel_bitmask[y];
@@ -400,6 +455,8 @@ OP_UNARY_EXPR(get, p.get_register(a))
 OP_UNARY_STMT(urgency, p.set_register(REG_URGENCY, a))
 OP_UNARY_STMT(brightness, p.set_register(REG_BRIGHTNESS, a))
 OP_UNARY_STMT(foreground, p.set_register(REG_FOREGROUND_COLOR, a))
+OP_UNARY_STMT(background, p.set_register(REG_BACKGROUND_COLOR, a))
+OP_UNARY_STMT(maskground, p.set_register(REG_MASKGROUND_COLOR, a))
 
 OP_NULLARY_STMT(fill, p.fill_screen())
 

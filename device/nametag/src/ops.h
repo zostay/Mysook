@@ -79,6 +79,8 @@ enum VMOp {
     OP_URGENCY      = 0x0091,
     OP_BRIGHTNESS   = 0x0092,
     OP_FOREGROUND   = 0x0093,
+    OP_BACKGROUND   = 0x0094,
+    OP_MASKGROUND   = 0x0095,
     OP_FILL         = 0x00A1,
     OP_PIXEL        = 0x00A2,
     OP_PUSH         = 0x00C1,
@@ -101,7 +103,7 @@ enum VMRegister {
     REG_BRIGHTNESS       = 0x0002,
     REG_FOREGROUND_COLOR = 0x0003,
     REG_BACKGROUND_COLOR = 0x0004,
-    REG_MASK_COLOR       = 0x0005,
+    REG_MASKGROUND_COLOR = 0x0005,
     REG_MARK             = 0x0006,
     REG_USER0            = 0x0010,
     REG_USER239          = 0x00FF,
@@ -138,6 +140,8 @@ template <int W, int H> void op_get(VM<W,H> &);
 template <int W, int H> void op_urgency(VM<W,H> &);
 template <int W, int H> void op_brightness(VM<W,H> &);
 template <int W, int H> void op_foreground(VM<W,H> &);
+template <int W, int H> void op_background(VM<W,H> &);
+template <int W, int H> void op_maskground(VM<W,H> &);
 template <int W, int H> void op_fill(VM<W,H> &);
 template <int W, int H> void op_pixel(VM<W,H> &);
 template <int W, int H> void op_push(VM<W,H> &);
@@ -187,6 +191,8 @@ OpCodes<W,H>::OpCodes() {
     ops[OP_URGENCY]      = op_urgency<W,H>;
     ops[OP_BRIGHTNESS]   = op_brightness<W,H>;
     ops[OP_FOREGROUND]   = op_foreground<W,H>;
+    ops[OP_BACKGROUND]   = op_background<W,H>;
+    ops[OP_MASKGROUND]   = op_maskground<W,H>;
     ops[OP_FILL]         = op_fill<W,H>;
     ops[OP_PIXEL]        = op_pixel<W,H>;
     ops[OP_PUSH]         = op_push<W,H>;
