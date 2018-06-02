@@ -20,7 +20,7 @@ public:
     virtual void tick() = 0;
 };
 
-class TickingTimer {
+class TickingTimer : public Ticking {
 protected:
     const unsigned long tick_speed;
     unsigned long next_tick = 0;
@@ -44,7 +44,7 @@ public:
     }
 };
 
-class TickingVariableTimer {
+class TickingVariableTimer : public Ticking {
 protected:
     unsigned long rollover = ULONG_MAX;
     unsigned long previous_tick = 0;
