@@ -10,7 +10,7 @@ char message[] = "Hello my name is Sterling!";
 uint32_t basic_program[] = {
     OP_SUB, PROGRAM_MAIN,
     OP_PUSH, 10, OP_URGENCY,
-    OP_PUSH, 30, OP_BRIGHTNESS,
+    OP_PUSH, 100, OP_BRIGHTNESS,
     OP_PUSH, 0xFFFF00, OP_MASKGROUND,
     OP_PUSH, 0xFF0000, OP_FOREGROUND, OP_FILL, OP_TICK,
     OP_PUSH, 0x00FF00, OP_FOREGROUND, OP_FILL, OP_TICK,

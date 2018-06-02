@@ -357,11 +357,14 @@ template <int W, int H>
 void VM<W,H>::draw() { 
     mysook::Color mask_color = get_register_color(REG_MASKGROUND_COLOR);
 
+    uint32_t base_mask = 0x01 << (W - 1);
     for (int y = 0; y < H; y++) {
         uint32_t row_mask = _panel_bitmask[y];
+        log.logf_ln("D [vm] row %d mask 0x%03X", y, row_mask);
 
         for (int x = 0; x < W; x++) {
-            uint32_t bit_mask = 0x01 << W;
+            uint32_t bit_mask = base_mask >> x;
+            log.logf_ln("D [vm] bit %d mask 0x%03X", x, bit_mask);
 
             if (!(bit_mask & row_mask)) {
                 put_pixel(x, y, mask_color);
@@ -464,7 +467,7 @@ template <int W, int H>
 void op_fill_rows(VM<W,H> &p) {
     uint32_t mask = p.pop();
 
-    uint32_t bit_mask = 0x01u << H;
+    uint32_t bit_mask = 0x01u << (H - 1);
     for (int y = 0; y < H; ++y) {
         uint32_t row_mask = mask & (bit_mask >> y);
 
@@ -478,7 +481,7 @@ template <int W, int H>
 void op_fill_columns(VM<W,H> &p) {
     uint32_t mask = p.pop();
 
-    uint32_t bit_mask = 0x01u << W;
+    uint32_t bit_mask = 0x01u << (W - 1);
     for (int x = 0; x < W; ++x) {
         uint32_t col_mask = mask & (bit_mask >> x);
 
@@ -494,7 +497,7 @@ void op_fill_bits(VM<W,H> &p) {
     for (int mp = 0; mp < H; ++mp)
         mask[mp] = p.pop();
 
-    uint32_t bit_mask = 0x01 << W;
+    uint32_t bit_mask = 0x01u << (W - 1);
     for (int y = 0; y < H; ++y) {
         uint32_t row_mask = mask[y];
 
@@ -510,7 +513,7 @@ template <int W, int H>
 void op_mask_rows(VM<W,H> &p) {
     uint32_t mask = p.pop();
 
-    uint32_t bit_mask = 0x01u << H;
+    uint32_t bit_mask = 0x01u << (H - 1);
     for (int y = 0; y < H; ++y) {
         if (mask & (bit_mask >> y))
             p._panel_bitmask[y] = 0xFFFFFFFFu;
@@ -523,7 +526,7 @@ template <int W, int H>
 void op_mask_columns(VM<W,H> &p) {
     uint32_t mask = p.pop();
 
-    uint32_t bit_mask = 0x01u << W;
+    uint32_t bit_mask = 0x01u << (W - 1);
     for (int x = 0; x < W; ++x) {
         uint32_t sel_mask = bit_mask >> x;
         uint32_t col_mask = mask & sel_mask;
