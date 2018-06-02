@@ -36,6 +36,8 @@ protected:
     mysook::RGBPanel<W, H> &panel;
     uint32_t _panel_bitmask[H];
 
+    int _start;
+
     int program_ptr = 0;
     int stack_ptr = 0;
 
@@ -58,6 +60,8 @@ public:
     const int width() const { return W; }
     const int height() const { return H; }
 
+    void begin();
+
     virtual unsigned long tick_speed() { return _tick_speed; }
     virtual void tick() { tick_exec(); }
 
@@ -65,7 +69,7 @@ public:
     void push(uint32_t v);
     
     void halt() { 
-        log.logf_ln("W [vm] HALT!");
+        log.logf_ln("W [vm] <PP:%04X> HALT!", program_ptr);
         halted = true; 
     }
 
@@ -86,12 +90,16 @@ public:
     void step_exec();
     void tick_exec();
 
-    void jump_sub(int program_ptr) {
+    void jump_sub(int new_program_ptr) {
+        //log.logf_ln("D [vm] save <PP:%04X>", program_ptr);
         push(program_ptr);
-        jump(program_ptr);
+        jump(new_program_ptr);
     }
 
-    void jump(int program_ptr) { this->program_ptr = program_ptr; }
+    void jump(int program_ptr) { 
+        //log.logf_ln("D [vm] jump <PP:%04X>", program_ptr);
+        this->program_ptr = program_ptr; 
+    }
 
     void reset_tick() { _tick = 0; }
     void next_tick() { _tick++; draw(); }
@@ -105,6 +113,8 @@ public:
             return 0;
         }
 
+        //log.logf_ln("D [vm] get register %d -> %d", reg, registers[reg]);
+
         return registers[reg];
     }
 
@@ -116,6 +126,7 @@ public:
             return;
         }
 
+        //log.logf_ln("D [vm] set register %d <- %d", reg, val);
         registers[reg] = val;
 
         switch (reg) {
@@ -155,7 +166,7 @@ public:
     virtual void put_pixel(int x, int y, mysook::Color c) { panel.put_pixel(x, y, c); }
     virtual void set_brightness(uint8_t brightness) { panel.set_brightness(brightness); }
     virtual void fill_screen(mysook::Color c) { 
-        log.logf_ln("D [vm] filling screen (%d, %d, %d)", c.r, c.g, c.b);
+        //log.logf_ln("D [vm] filling screen (%d, %d, %d)", c.r, c.g, c.b);
         panel.fill_screen(c); 
     }
     virtual void put_char(unsigned char c, int x, int y, mysook::Color fg, mysook::Color bg) { panel.put_char(c, x, y, fg, bg); }
@@ -165,11 +176,14 @@ public:
 
 template <int W, int H>
 VM<W,H>::VM(mysook::Logger &log, mysook::RGBPanel<W,H> &panel, const uint32_t *program, uint32_t start) 
-: log(log), panel(panel), program(program) { 
+: log(log), panel(panel), program(program), _start(start) { }
+
+template <int W, int H>
+void VM<W,H>::begin() {
 
     scan_subs();
 
-    program_ptr = get_sub(start);
+    program_ptr = get_sub(_start);
 
     for (int bmp = 0; bmp < H; ++bmp) {
         _panel_bitmask[bmp] = (0x01 << W) - 1;
@@ -198,6 +212,7 @@ void VM<W,H>::scan_subs() {
     int i = 0;
     while (program[i] != OP_HALT) {
         if (program[i] == OP_SUB) {
+            //log.logf_ln("D [vm] call_index %d -> <PP:%04X>", program[i + 1], i);
             call_index[ program[i + 1] ] = i;
         }
 
@@ -275,6 +290,15 @@ void VM<W,H>::step_exec() {
             set_register(REG_TICK_MODE, MODE_NONE);
         }
     }
+
+    String stack_str;
+    bool first = true;
+    for (int i = 0; i < stack_ptr; ++i) {
+        if (!first) stack_str += ", ";
+        stack_str += String(stack[i]);
+        first = false;
+    }
+    //log.logf_ln("D [vm] stack: %s", stack_str.c_str());
 }
 
 template <int W, int H>
@@ -329,7 +353,7 @@ mysook::Color VM<W,H>::get_register_color(int reg) {
     uint8_t g = (color & 0x00FF00) >> 8;
     uint8_t b = (color & 0x0000FF);
 
-    log.logf_ln("D [vm] 0x%06X -> (%d, %d, %d)", color, r, g, b);
+    //log.logf_ln("D [vm] 0x%06X -> (%d, %d, %d)", color, r, g, b);
 
     return mysook::Color(r, g, b);
 }
@@ -348,7 +372,7 @@ void VM<W,H>::set_register_color(int reg, mysook::Color val) {
     color |= val.g << 8;
     color |= val.b;
 
-    log.logf_ln("D [vm] (%d, %d, %d) -> 0x%06X", val.r, val.g, val.b, color);
+    //log.logf_ln("D [vm] (%d, %d, %d) -> 0x%06X", val.r, val.g, val.b, color);
 
     set_register(reg, color);
 }
@@ -360,11 +384,11 @@ void VM<W,H>::draw() {
     uint32_t base_mask = 0x01 << (W - 1);
     for (int y = 0; y < H; y++) {
         uint32_t row_mask = _panel_bitmask[y];
-        log.logf_ln("D [vm] row %d mask 0x%03X", y, row_mask);
+        //log.logf_ln("D [vm] row %d mask 0x%03X", y, row_mask);
 
         for (int x = 0; x < W; x++) {
             uint32_t bit_mask = base_mask >> x;
-            log.logf_ln("D [vm] bit %d mask 0x%03X", x, bit_mask);
+            //log.logf_ln("D [vm] bit %d mask 0x%03X", x, bit_mask);
 
             if (!(bit_mask & row_mask)) {
                 put_pixel(x, y, mask_color);
@@ -429,24 +453,24 @@ OP_NULLARY_STMT(tick, p.next_tick())
 OP_UNARY_STMT(tick_mode, p.set_register(REG_TICK_MODE, a))
 OP_NULLARY_STMT(noop, return);
 
-OP_BINARY_STMT(cmp, if (!a) p.jump(p.get_sub(b)))
-OP_BINARY_STMT(cmpsub, if (!a) p.jump_sub(p.get_sub(b)))
+OP_BINARY_STMT(cmp, if (b) p.jump(p.get_sub(a)))
+OP_BINARY_STMT(cmpsub, if (b) p.jump_sub(p.get_sub(a)))
 
-OP_BINARY_EXPR(eq, !(a == b))
-OP_BINARY_EXPR(lt, !(a < b))
-OP_BINARY_EXPR(le, !(a <= b))
-OP_BINARY_EXPR(gt, !(a > b))
-OP_BINARY_EXPR(ge, !(a >= b))
-OP_BINARY_EXPR(ne, !(a != b))
+OP_BINARY_EXPR(eq, b == a)
+OP_BINARY_EXPR(lt, b <  a)
+OP_BINARY_EXPR(le, b <= a)
+OP_BINARY_EXPR(gt, b >  a)
+OP_BINARY_EXPR(ge, b >= a)
+OP_BINARY_EXPR(ne, b != a)
 
-OP_BINARY_EXPR(add, a + b)
-OP_BINARY_EXPR(min, a - b)
-OP_BINARY_EXPR(mul, a * b)
-OP_BINARY_EXPR(div, a / b)
-OP_BINARY_EXPR(mod, a % b)
+OP_BINARY_EXPR(add, b + a)
+OP_BINARY_EXPR(min, b - a)
+OP_BINARY_EXPR(mul, b * a)
+OP_BINARY_EXPR(div, b / a)
+OP_BINARY_EXPR(mod, b % a)
 
-OP_BINARY_EXPR(and, a & b)
-OP_BINARY_EXPR(or, a | b)
+OP_BINARY_EXPR(and, b & a)
+OP_BINARY_EXPR(or,  b | a)
 OP_UNARY_EXPR(not, !a)
 
 OP_NULLARY_EXPR(rand, rand())
@@ -507,7 +531,7 @@ void op_fill_bits(VM<W,H> &p) {
     }
 }
 
-OP_BINARY_STMT(pixel, p.put_pixel(a, b));
+OP_BINARY_STMT(pixel, p.put_pixel(b, a));
 
 template <int W, int H>
 void op_mask_rows(VM<W,H> &p) {
