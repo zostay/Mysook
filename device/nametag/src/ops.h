@@ -82,6 +82,7 @@ enum VMOp {
     OP_POP          = 0x00C2,
     OP_DUP          = 0x00C3,
     OP_SWAP         = 0x00C5,
+    OP_ALLOC        = 0x00CA,
     OP_URGENCY      = 0x0183,
     OP_BRIGHTNESS   = 0x0283,
     OP_FOREGROUND   = 0x0383,
@@ -146,6 +147,7 @@ template <int W, int H> void op_push(VM<W,H> &);
 template <int W, int H> void op_pop(VM<W,H> &);
 template <int W, int H> void op_dup(VM<W,H> &);
 template <int W, int H> void op_swap(VM<W,H> &);
+template <int W, int H> void op_alloc(VM<W,H> &);
 template <int W, int H> void op_urgency(VM<W,H> &);
 template <int W, int H> void op_brightness(VM<W,H> &);
 template <int W, int H> void op_foreground(VM<W,H> &);
@@ -199,6 +201,7 @@ OpCodes<W,H>::OpCodes() {
     ops[OP_POP]          = op_pop<W,H>;
     ops[OP_DUP]          = op_dup<W,H>;
     ops[OP_SWAP]         = op_swap<W,H>;
+    ops[OP_ALLOC]        = op_alloc<W,H>;
     ops[OP_URGENCY]      = op_urgency<W,H>;
     ops[OP_BRIGHTNESS]   = op_brightness<W,H>;
     ops[OP_FOREGROUND]   = op_foreground<W,H>;

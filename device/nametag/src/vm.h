@@ -196,6 +196,12 @@ public:
         stack[stack_ptr] = val;
     }
 
+    void allocate_stack(int amount, uint32_t initializer) {
+        for (int i = 0; i < amount; ++i) {
+            push(initializer);
+        }
+    }
+
 public:
     using mysook::RGBPanel<W,H>::put_pixel;
     using mysook::RGBPanel<W,H>::fill_screen;
@@ -640,5 +646,6 @@ void op_swap(VM<W,H> &p) {
 
 OP_UNARY_STMT(read, p.read_stack(REG_STACK_SEGMENT + a))
 OP_BINARY_STMT(write, p.write_stack(REG_STACK_SEGMENT + a, b))
+OP_BINARY_STMT(alloc, p.allocate_stack(a, b))
 
 #endif//__VM_H
