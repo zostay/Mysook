@@ -47,10 +47,12 @@ public:
 class TickingVariableTimer : public Ticking {
 protected:
     unsigned long rollover = ULONG_MAX;
-    unsigned long previous_tick = 0;
-    unsigned long next_tick = 0;
+    unsigned long previous_tick = get_micros();
+    unsigned long next_tick = get_micros();
 
 public:
+    TickingVariableTimer() { nudge_tick(); }
+
     virtual unsigned long tick_speed() { return 0; }
 
     void set_previous_tick() { previous_tick = get_micros(); }
@@ -107,6 +109,21 @@ public:
 
         tickers[ticker_count++] = ticker;
     }
+
+    void remove(TickerPtr ticker) {
+        bool searching = true;
+        for (int i = 0; i < ticker_count; ++i) {
+            if (searching) {
+                if (tickers[i] == ticker)
+                    searching = false;
+            }
+            else {
+                ticker[i - 1] = ticker[i];
+            }
+
+            --ticker_count;
+        }
+    }
 };
 
 class Firmware : public TickingVariableTimer {
@@ -126,8 +143,16 @@ public:
         pre_tickers.add(ticker);
     }
 
+    void remove_pre_ticker(Ticking *ticker) {
+        pre_tickers.remove(ticker);
+    }
+
     void add_post_ticker(Ticking *ticker) {
         post_tickers.add(ticker);
+    }
+
+    void remove_post_ticker(Ticking *ticker) {
+        post_tickers.remove(ticker);
     }
 
     virtual void start() = 0;

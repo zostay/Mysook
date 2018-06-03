@@ -11,7 +11,7 @@
 
 #include "ops.h"
 
-#define STACK_SIZE 256
+#define STACK_SIZE 4096
 #define HEAP_SIZE  256
 
 #define PANEL_WIDTH 12
@@ -38,6 +38,7 @@ protected:
 
     int _start;
 
+    int max_ptr = 0;
     int program_ptr = 0;
     int stack_ptr = 0;
 
@@ -47,6 +48,7 @@ protected:
 
     bool halted = false;
 
+    friend void op_halt<W,H>(VM<W,H> &);
     friend void op_mask_columns<W,H>(VM<W,H> &);
     friend void op_mask_rows<W,H>(VM<W,H> &);
     friend void op_mask_bits<W,H>(VM<W,H> &);
@@ -73,6 +75,8 @@ public:
         halted = true; 
     }
 
+    bool has_halted() { return halted; }
+
     int get_sub(uint32_t sub) { 
         try {
             return call_index.at(sub);
@@ -93,12 +97,26 @@ public:
     void jump_sub(int new_program_ptr) {
         //log.logf_ln("D [vm] save <PP:%04X>", program_ptr);
         push(program_ptr);
+        push(get_register(REG_STACK_SEGMENT));
+        set_register(REG_STACK_SEGMENT, stack_ptr);
         jump(new_program_ptr);
     }
 
-    void jump(int program_ptr) { 
-        //log.logf_ln("D [vm] jump <PP:%04X>", program_ptr);
-        this->program_ptr = program_ptr; 
+    void return_sub(int return_stack_ptr, int return_program_ptr) {
+        set_register(REG_STACK_SEGMENT, return_stack_ptr);
+        jump(return_program_ptr);
+    }
+
+    void jump(int new_program_ptr) { 
+        if (new_program_ptr > max_ptr || new_program_ptr < 0) {
+            // PANIC!
+            log.logf_ln("E [vm] jump <PP:%04X> is out of the program (max <PP:%04X>)", new_program_ptr, max_ptr);
+            halt();
+            return;
+        }
+
+        //log.logf_ln("D [vm] jump <PP:%04X>", new_program_ptr);
+        program_ptr = new_program_ptr; 
     }
 
     void reset_tick() { _tick = 0; }
@@ -106,7 +124,7 @@ public:
     bool has_ticked() { return _tick; }
 
     uint32_t get_register(int reg) {
-        if (reg < 0 || reg > 255) {
+        if (reg < 0 || reg >= HEAP_SIZE) {
             // PANIC!
             log.logf_ln("E [vm] get illegal register %d", reg);
             halt();
@@ -119,7 +137,7 @@ public:
     }
 
     void set_register(int reg, uint32_t val) {
-        if (reg < 0 || reg > 255) {
+        if (reg < 0 || reg >= HEAP_SIZE) {
             // PANIC!
             log.logf_ln("E [vm] set illegal register %d", reg);
             halt();
@@ -132,6 +150,8 @@ public:
         switch (reg) {
         case REG_URGENCY:
             _tick_speed = hertz(val);
+            this->nudge_tick();
+            log.logf_ln("I [vm] tick_speed = %ld", _tick_speed);
             break;
 
         case REG_BRIGHTNESS: 
@@ -154,6 +174,28 @@ public:
     mysook::Color get_register_color(int reg);
     void set_register_color(int reg, mysook::Color val);
 
+    uint32_t read_stack(int stack_ptr) {
+        if (stack_ptr < 0 || stack_ptr >= STACK_SIZE) {
+            // PANIC!
+            log.logf_ln("E [vm] segmentation fault reading %d", stack_ptr);
+            halt();
+            return 0;
+        }
+
+        return stack[stack_ptr];
+    }
+
+    void write_stack(int stack_ptr, uint32_t val) {
+        if (stack_ptr < 0 || stack_ptr >= STACK_SIZE) {
+            // PANIC!
+            log.logf_ln("E [vm] segmentation fault writing %d", stack_ptr);
+            halt();
+            return;
+        }
+
+        stack[stack_ptr] = val;
+    }
+
 public:
     using mysook::RGBPanel<W,H>::put_pixel;
     using mysook::RGBPanel<W,H>::fill_screen;
@@ -166,7 +208,7 @@ public:
     virtual void put_pixel(int x, int y, mysook::Color c) { panel.put_pixel(x, y, c); }
     virtual void set_brightness(uint8_t brightness) { panel.set_brightness(brightness); }
     virtual void fill_screen(mysook::Color c) { 
-        //log.logf_ln("D [vm] filling screen (%d, %d, %d)", c.r, c.g, c.b);
+        log.logf_ln("D [vm] filling screen (%d, %d, %d)", c.r, c.g, c.b);
         panel.fill_screen(c); 
     }
     virtual void put_char(unsigned char c, int x, int y, mysook::Color fg, mysook::Color bg) { panel.put_char(c, x, y, fg, bg); }
@@ -205,6 +247,7 @@ void VM<W,H>::begin() {
     set_bg(mysook::Color(0, 0, 0));
 
     registers[REG_MARK]             = 0;
+    registers[REG_STACK_SEGMENT]    = 0;
 }
 
 template <int W, int H>
@@ -226,6 +269,8 @@ void VM<W,H>::scan_subs() {
             ++i;
         }
     }
+
+    max_ptr = i;
 }
 
 template <int W, int H>
@@ -306,7 +351,7 @@ void VM<W,H>::tick_exec() {
     if (halted) return;
 
     reset_tick();
-    while (!has_ticked()) step_exec();
+    while (!has_ticked() && !has_halted()) step_exec();
 
     log.logf_ln("I [vm] Tick!");
 }
@@ -340,7 +385,7 @@ void VM<W,H>::push(uint32_t v) {
 
 template <int W, int H>
 mysook::Color VM<W,H>::get_register_color(int reg) {
-    if (reg < 0 || reg > 255) {
+    if (reg < 0 || reg >= HEAP_SIZE) {
         // PANIC!
         log.logf_ln("E [vm] get illegal color register %d", reg);
         halt();
@@ -360,7 +405,7 @@ mysook::Color VM<W,H>::get_register_color(int reg) {
 
 template <int W, int H>
 void VM<W,H>::set_register_color(int reg, mysook::Color val) {
-    if (reg < 0 || reg > 255) {
+    if (reg < 0 || reg >= HEAP_SIZE) {
         // PANIC!
         log.logf_ln("E [vm] set illegal color register %d", reg);
         halt();
@@ -444,13 +489,17 @@ void op_##name(VM<W,H> &p) { \
     op; \
 }
 
-OP_NULLARY_STMT(halt, p.halt())
+template <int W, int H> \
+void op_halt(VM<W,H> &p) { \
+    p.log.logf_ln("I [vm] halt instruction");
+    p.halt();
+}
+
 OP_NULLARY_STMT(sub, p.step())
-OP_UNARY_STMT(return, p.jump(a))
+OP_BINARY_STMT(return, p.return_sub(a, b))
 OP_UNARY_STMT(goto, p.jump(p.get_sub(a)))
 OP_UNARY_STMT(gosub, p.jump_sub(p.get_sub(a)))
 OP_NULLARY_STMT(tick, p.next_tick())
-OP_UNARY_STMT(tick_mode, p.set_register(REG_TICK_MODE, a))
 OP_NULLARY_STMT(noop, return);
 
 OP_BINARY_STMT(cmp, if (b) p.jump(p.get_sub(a)))
@@ -479,11 +528,13 @@ OP_NULLARY_EXPR(height, H)
 
 OP_BINARY_STMT(set, p.set_register(a, b))
 OP_UNARY_EXPR(get, p.get_register(a))
+OP_UNARY_STMT(tick_mode, p.set_register(REG_TICK_MODE, a))
 OP_UNARY_STMT(urgency, p.set_register(REG_URGENCY, a))
 OP_UNARY_STMT(brightness, p.set_register(REG_BRIGHTNESS, a))
 OP_UNARY_STMT(foreground, p.set_register(REG_FOREGROUND_COLOR, a))
 OP_UNARY_STMT(background, p.set_register(REG_BACKGROUND_COLOR, a))
 OP_UNARY_STMT(maskground, p.set_register(REG_MASKGROUND_COLOR, a))
+OP_NULLARY_STMT(mark, p.set_register(REG_MARK, 0));
 
 OP_NULLARY_STMT(fill, p.fill_screen())
 
@@ -587,6 +638,7 @@ void op_swap(VM<W,H> &p) {
     p.push(b);
 }
 
-OP_NULLARY_STMT(mark, p.set_register(REG_MARK, 0));
+OP_UNARY_STMT(read, p.read_stack(REG_STACK_SEGMENT + a))
+OP_BINARY_STMT(write, p.write_stack(REG_STACK_SEGMENT + a, b))
 
 #endif//__VM_H

@@ -141,7 +141,11 @@ public:
     }
 
     const String &body() const { return _body; }
-    void body(const String &body) { _body = body; }
+    void body(const String &body) { 
+        _body = String("");
+        for (int i = 0; i < body.length(); ++i)
+            _body.concat(body[i]); 
+    }
 
     void finalize() {
         for (int i = 0; i < this->header_count(); ++i) {
@@ -224,6 +228,8 @@ public:
     }
 };
 
+const String INTERNAL_ERROR = "Internal Server Error";
+
 class Response : public Message {
 protected:
     uint16_t _status_code;
@@ -236,11 +242,22 @@ public:
     Response(int code, String &status, String &body) : _status_code(code), _status_message(status), Message(body) { }
     Response(int code, String &status, Message &msg) : _status_code(code), _status_message(status), Message(msg) { } 
 
-    uint16_t &status_code() { return _status_code; }
-    String &status_message() { return _status_message; }
+    uint16_t status_code() const { return _status_code; }
+    const String &status_message() const { return _status_message; }
+
+    void status(uint16_t sc, const String &sm) {
+        _status_code = sc;
+        _status_message = sm;
+    }
 
     void finalize() {
         Message::finalize();
+
+        if (_status_code < 100 || _status_code > 599) {
+            status(500, INTERNAL_ERROR);
+            String empty = "";
+            this->body(empty);
+        }
 
         this->header(Message::CONTENT_LENGTH, String(this->body().length()));
     }
@@ -249,7 +266,7 @@ public:
         finalize();
 
         String res("HTTP/1.0 ");
-        res += _status_code + " " + _status_message + "\r\n";
+        res += String(_status_code) + " " + _status_message + "\r\n";
 
         for (int i = 0; i < this->header_count(); ++i) {
             const Header &h = this->header(i);
@@ -272,6 +289,26 @@ enum RequestState {
     REQ_STATE_BODY,
 };
 
+#define MAX_REQ_LENGTH 65535
+
+struct ClientState {
+    WiFiClient client;
+    bool active;
+    Request request;
+    String buf;
+    RequestState state;
+    long bytes_read;
+
+    void reset() {
+        active     = false;
+        client     = WiFiClient();
+        request    = Request();
+        buf        = String();
+        state      = REQ_STATE_START;
+        bytes_read = 0;
+    }
+};
+
 class WebServer : public Ticking {
 protected:
     Network &network;
@@ -281,20 +318,16 @@ protected:
 
     bool start = false;
 
-    WiFiClient clients[MAX_CLIENTS];
-    bool active[MAX_CLIENTS];
-    Request requests[MAX_CLIENTS];
-    String bufs[MAX_CLIENTS];
-    RequestState states[MAX_CLIENTS];
+    ClientState conn[MAX_CLIENTS];
 
     void accept_client() {
         auto client = server.available();
         if (!client) return;
 
         for (int i = 0; i < MAX_CLIENTS; ++i) {
-            if (!clients[i]) {
-                active[i] = true;
-                clients[i] = client;
+            if (!conn[i].client) {
+                conn[i].active = true;
+                conn[i].client = client;
                 log.logf_ln("I [webserver] New client connected (%d)", i);
                 return;
             }
@@ -308,42 +341,49 @@ protected:
     const String NOT_FOUND   = "Not Found";
     const String BAD_REQUEST = "Bad Request";
     const String BAD_METHOD  = "Bad Method";
+    const String TOO_LARGE   = "Too Large";
 
     const String GET  = "GET";
     const String POST = "POST";
 
     void handle_request() {
         for (int i = 0; i < MAX_CLIENTS; ++i) {
-            auto &client = clients[i];
 
             // Connection is closed, nothing left to do here.
-            if (active[i] && !client.connected()) {
-                reset(i);
+            if (conn[i].active && !conn[i].client.connected()) {
+                conn[i].reset();
                 continue;
             }
 
-            while (client.available()) {
-                char c = client.read();
-                log.logf("%c", c);
+            while (conn[i].client.available()) {
+                char c = conn[i].client.read();
+                if (++conn[i].bytes_read > MAX_REQ_LENGTH) {
+                    log.logf_ln("E [webserver] client request is too long");
+
+                    respond_with(i, 413, TOO_LARGE);
+                    break;
+                }
+
+                //log.logf("%c", c);
 
                 bool bad_request = false;
                 bool bad_method = false;
 
-                switch (states[i]) {
+                switch (conn[i].state) {
                 case REQ_STATE_START:
                     if (c == '\n') {
                         int path_start = -1;
-                        if (bufs[i].startsWith("GET ")) {
-                            requests[i].method(GET);
+                        if (conn[i].buf.startsWith("GET ")) {
+                            conn[i].request.method(GET);
                             path_start = 4;
 
-                            //log.logf_ln("D [webserver] method GET (%s) is ok", requests[i].method().c_str());
+                            //log.logf_ln("D [webserver] method GET (%s) is ok", conn[i].request.method().c_str());
                         }
-                        else if (bufs[i].startsWith("POST ")) {
-                            requests[i].method(POST);
+                        else if (conn[i].buf.startsWith("POST ")) {
+                            conn[i].request.method(POST);
                             path_start = 5;
 
-                            //log.logf_ln("D [webserver] method POST (%s) is ok", requests[i].method().c_str());
+                            //log.logf_ln("D [webserver] method POST (%s) is ok", conn[i].request.method().c_str());
                         }
                         else {
                             bad_method = true;
@@ -351,56 +391,56 @@ protected:
                             //log.logf_ln("D [webserver] method is bad");
                         }
 
-                        int path_end = bufs[i].indexOf(' ', path_start);
+                        int path_end = conn[i].buf.indexOf(' ', path_start);
 
                         if (path_start > 0 && path_end > 0) {
-                            String path = bufs[i].substring(path_start, path_end);
-                            requests[i].path(path);
+                            String path = conn[i].buf.substring(path_start, path_end);
+                            conn[i].request.path(path);
                         }
 
-                        //log.logf_ln("D [webserver] path (%s) is ok? %d", requests[i].path().c_str(), !bad_request);
+                        //log.logf_ln("D [webserver] path (%s) is ok? %d", conn[i].request.path().c_str(), !bad_request);
 
-                        String http_version = bufs[i].substring(path_end + 1);
+                        String http_version = conn[i].buf.substring(path_end + 1);
                         if (!http_version.startsWith("HTTP/1.")) bad_request = true;
                         //log.logf_ln("D [webserver] HTTP version (%s) prefix is ok? %d", http_version.c_str(), !bad_request);
                         if (http_version[7] != '0' && http_version[7] != '1') bad_request = true;
                         //log.logf_ln("D [webserver] HTTP version (%s) suffix is ok? %d", http_version.c_str(), !bad_request);
 
-                        bufs[i] = String();
+                        conn[i].buf = String();
 
-                        states[i] = REQ_STATE_HEADER;
+                        conn[i].state = REQ_STATE_HEADER;
                     }
                     else if (c != '\r') {
-                        bufs[i] += c;
+                        conn[i].buf += c;
                     }
                     break;
 
                 case REQ_STATE_HEADER:
                     if (c == '\n') {
-                        if (bufs[i].length() == 0) {
+                        if (conn[i].buf.length() == 0) {
                             //log.logf_ln("D [webserver] headers are done");
-                            if (requests[i].method() == GET || requests[i].content_length() == 0) {
+                            if (conn[i].request.method() == GET || conn[i].request.content_length() == 0) {
                                 handle_request(i);
                             }
-                            else if (requests[i].content_length() > 0) {
-                                states[i] = REQ_STATE_BODY;
+                            else if (conn[i].request.content_length() > 0) {
+                                conn[i].state = REQ_STATE_BODY;
                             }
                             else {
                                 bad_request = true;
                             }
                         }
                         else {
-                            int colon = bufs[i].indexOf(':');
+                            int colon = conn[i].buf.indexOf(':');
                             if (colon > 0) {
-                                String name = bufs[i].substring(0, colon);
-                                String value = bufs[i].substring(colon + 1);
+                                String name = conn[i].buf.substring(0, colon);
+                                String value = conn[i].buf.substring(colon + 1);
 
                                 name.trim();
                                 value.trim();
 
                                 if (name.length() > 0) {
                                     //log.logf_ln("D [webserver] good header %s=%s", name.c_str(), value.c_str());
-                                    requests[i].header(name, value);
+                                    conn[i].request.header(name, value);
                                 }
                                 else {
                                     //log.logf_ln("D [webserver] bad header %s=%s", name.c_str(), value.c_str());
@@ -408,28 +448,29 @@ protected:
                                 }
                             }
                             else {
-                                //log.logf_ln("D [webserver] bad header line %s", bufs[i].c_str());
+                                //log.logf_ln("D [webserver] bad header line %s", conn[i].buf.c_str());
                                 bad_request = true;
                             }
                         }
 
-                        bufs[i] = String();
+                        conn[i].buf = String();
                     }
                     else if (c != '\r') {
-                        bufs[i] += c;
+                        conn[i].buf += c;
                     }
                     break;
 
                 case REQ_STATE_BODY:
-                    int cl = requests[i].content_length();
+                    int cl = conn[i].request.content_length();
                     if (cl >= 0) {
-                        if (cl <= bufs[i].length()) {
-                            //log.logf_ln("D [webserver] handling POST with POSTDATA %s", bufs[i].c_str());
-                            requests[i].body(bufs[i].substring(0, cl));
+                        //log.logf_ln("D [webserver] POSTDATA %02X", c);
+                        conn[i].buf += c;
+                        //log.logf_ln("D [webserver] POSTDATA so far: %d, Content-Length: %d", conn[i].buf.length(), cl);
+
+                        if (cl <= conn[i].buf.length()) {
+                            //log.logf_ln("D [webserver] handling POST with POSTDATA %s", conn[i].buf.c_str());
+                            conn[i].request.body(conn[i].buf);
                             handle_request(i);
-                        }
-                        else {
-                            bufs[i] += c;
                         }
                     }
                     else {
@@ -447,41 +488,32 @@ protected:
         }
     }
 
-    void reset(int i) {
-        log.logf_ln("I [webserver] Client disconnected (%d)", i);
-
-        active[i]   = false;
-        clients[i]  = WiFiClient();
-        requests[i] = Request();
-        bufs[i]     = String();
-        states[i]   = REQ_STATE_START;
-    }
-
     void respond_with(int i, int code, const String &msg) {
         log.logf_ln("I [webserver] Response (%d) %d %s", i, code, msg.c_str());
 
-        clients[i].print("HTTP/1.0 ");
-        clients[i].print(code);
-        clients[i].print(" ");
-        clients[i].print(msg);
-        clients[i].print("\r\n\r\n");
-        clients[i].print(msg);
-        clients[i].stop();
+        conn[i].client.print("HTTP/1.0 ");
+        conn[i].client.print(code);
+        conn[i].client.print(" ");
+        conn[i].client.print(msg);
+        conn[i].client.print("\r\n\r\n");
+        conn[i].client.print(msg);
+        conn[i].client.stop();
 
-        reset(i);
+        conn[i].reset();
     }
 
     void respond_with(int i, Response &res) {
         log.logf_ln("I [webserver] Response (%d) %d %s", i, res.status_code(), res.status_message().c_str());
 
-        clients[i].print(res.toString());
+        //log.logf(res.toString().c_str());
+        conn[i].client.print(res.toString());
 
-        reset(i);
+        conn[i].reset();
     }
 
     void handle_request(int i) {
         Response res;
-        if (dispatcher(requests[i], res)) {
+        if (dispatcher(conn[i].request, res)) {
             respond_with(i, res);
         }
         else {
@@ -506,7 +538,7 @@ protected:
 public:
     WebServer(Network &network, WebDispatcher &dispatcher, Logger &log) : network(network), server(80, MAX_CLIENTS), dispatcher(dispatcher), log(log) { 
         for (int i = 0; i < MAX_CLIENTS; ++i)
-            reset(i);
+            conn[i].reset();
     }
 
     void begin() {

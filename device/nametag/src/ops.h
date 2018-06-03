@@ -53,7 +53,6 @@ enum VMOp {
     OP_GOTO         = 0x0003,
     OP_GOSUB        = 0x0004,
     OP_TICK         = 0x0005,
-    OP_TICK_MODE    = 0x0007,
     OP_NOOP         = 0x0008,
     OP_CMP          = 0x0011,
     OP_CMPSUB       = 0x0012,
@@ -76,24 +75,27 @@ enum VMOp {
     OP_HEIGHT       = 0x0053,
     OP_SET          = 0x0081,
     OP_GET          = 0x0082,
-    OP_URGENCY      = 0x0091,
-    OP_BRIGHTNESS   = 0x0092,
-    OP_FOREGROUND   = 0x0093,
-    OP_BACKGROUND   = 0x0094,
-    OP_MASKGROUND   = 0x0095,
+    OP_TICK_MODE    = 0x0083,
     OP_FILL         = 0x00A1,
     OP_PIXEL        = 0x00A2,
     OP_PUSH         = 0x00C1,
     OP_POP          = 0x00C2,
     OP_DUP          = 0x00C3,
     OP_SWAP         = 0x00C5,
-    OP_MARK         = 0x00C7,
+    OP_URGENCY      = 0x0183,
+    OP_BRIGHTNESS   = 0x0283,
+    OP_FOREGROUND   = 0x0383,
+    OP_BACKGROUND   = 0x0483,
+    OP_MASKGROUND   = 0x0583,
+    OP_MARK         = 0x0683,
     OP_FILL_ROWS    = 0x20A1,
     OP_MASK_ROWS    = 0x20B1,
     OP_FILL_COLUMNS = 0x40A1,
     OP_MASK_COLUMNS = 0x40B1,
     OP_FILL_BITS    = 0x80A1,
     OP_MASK_BITS    = 0x80B1,
+    OP_READ         = 0x80C8,
+    OP_WRITE        = 0x80C9,
     OP_HALT         = 0xDEAD,
 };
 
@@ -105,6 +107,7 @@ enum VMRegister {
     REG_BACKGROUND_COLOR = 0x0004,
     REG_MASKGROUND_COLOR = 0x0005,
     REG_MARK             = 0x0006,
+    REG_STACK_SEGMENT    = 0x0007,
     REG_USER0            = 0x0010,
     REG_USER239          = 0x00FF,
 };
@@ -114,7 +117,6 @@ template <int W, int H> void op_return(VM<W,H> &);
 template <int W, int H> void op_goto(VM<W,H> &);
 template <int W, int H> void op_gosub(VM<W,H> &);
 template <int W, int H> void op_tick(VM<W,H> &);
-template <int W, int H> void op_tick_mode(VM<W,H> &);
 template <int W, int H> void op_noop(VM<W,H> &);
 template <int W, int H> void op_cmp(VM<W,H> &);
 template <int W, int H> void op_cmpsub(VM<W,H> &);
@@ -137,17 +139,18 @@ template <int W, int H> void op_width(VM<W,H> &);
 template <int W, int H> void op_height(VM<W,H> &);
 template <int W, int H> void op_set(VM<W,H> &);
 template <int W, int H> void op_get(VM<W,H> &);
-template <int W, int H> void op_urgency(VM<W,H> &);
-template <int W, int H> void op_brightness(VM<W,H> &);
-template <int W, int H> void op_foreground(VM<W,H> &);
-template <int W, int H> void op_background(VM<W,H> &);
-template <int W, int H> void op_maskground(VM<W,H> &);
+template <int W, int H> void op_tick_mode(VM<W,H> &);
 template <int W, int H> void op_fill(VM<W,H> &);
 template <int W, int H> void op_pixel(VM<W,H> &);
 template <int W, int H> void op_push(VM<W,H> &);
 template <int W, int H> void op_pop(VM<W,H> &);
 template <int W, int H> void op_dup(VM<W,H> &);
 template <int W, int H> void op_swap(VM<W,H> &);
+template <int W, int H> void op_urgency(VM<W,H> &);
+template <int W, int H> void op_brightness(VM<W,H> &);
+template <int W, int H> void op_foreground(VM<W,H> &);
+template <int W, int H> void op_background(VM<W,H> &);
+template <int W, int H> void op_maskground(VM<W,H> &);
 template <int W, int H> void op_mark(VM<W,H> &);
 template <int W, int H> void op_fill_rows(VM<W,H> &);
 template <int W, int H> void op_mask_rows(VM<W,H> &);
@@ -155,6 +158,8 @@ template <int W, int H> void op_fill_columns(VM<W,H> &);
 template <int W, int H> void op_mask_columns(VM<W,H> &);
 template <int W, int H> void op_fill_bits(VM<W,H> &);
 template <int W, int H> void op_mask_bits(VM<W,H> &);
+template <int W, int H> void op_read(VM<W,H> &);
+template <int W, int H> void op_write(VM<W,H> &);
 template <int W, int H> void op_halt(VM<W,H> &);
 
 template <int W, int H>
@@ -165,7 +170,6 @@ OpCodes<W,H>::OpCodes() {
     ops[OP_GOTO]         = op_goto<W,H>;
     ops[OP_GOSUB]        = op_gosub<W,H>;
     ops[OP_TICK]         = op_tick<W,H>;
-    ops[OP_TICK_MODE]    = op_tick_mode<W,H>;
     ops[OP_NOOP]         = op_noop<W,H>;
     ops[OP_CMP]          = op_cmp<W,H>;
     ops[OP_CMPSUB]       = op_cmpsub<W,H>;
@@ -188,17 +192,18 @@ OpCodes<W,H>::OpCodes() {
     ops[OP_HEIGHT]       = op_height<W,H>;
     ops[OP_SET]          = op_set<W,H>;
     ops[OP_GET]          = op_get<W,H>;
-    ops[OP_URGENCY]      = op_urgency<W,H>;
-    ops[OP_BRIGHTNESS]   = op_brightness<W,H>;
-    ops[OP_FOREGROUND]   = op_foreground<W,H>;
-    ops[OP_BACKGROUND]   = op_background<W,H>;
-    ops[OP_MASKGROUND]   = op_maskground<W,H>;
+    ops[OP_TICK_MODE]    = op_tick_mode<W,H>;
     ops[OP_FILL]         = op_fill<W,H>;
     ops[OP_PIXEL]        = op_pixel<W,H>;
     ops[OP_PUSH]         = op_push<W,H>;
     ops[OP_POP]          = op_pop<W,H>;
     ops[OP_DUP]          = op_dup<W,H>;
     ops[OP_SWAP]         = op_swap<W,H>;
+    ops[OP_URGENCY]      = op_urgency<W,H>;
+    ops[OP_BRIGHTNESS]   = op_brightness<W,H>;
+    ops[OP_FOREGROUND]   = op_foreground<W,H>;
+    ops[OP_BACKGROUND]   = op_background<W,H>;
+    ops[OP_MASKGROUND]   = op_maskground<W,H>;
     ops[OP_MARK]         = op_mark<W,H>;
     ops[OP_FILL_ROWS]    = op_fill_rows<W,H>;
     ops[OP_MASK_ROWS]    = op_mask_rows<W,H>;
@@ -206,6 +211,8 @@ OpCodes<W,H>::OpCodes() {
     ops[OP_MASK_COLUMNS] = op_mask_columns<W,H>;
     ops[OP_FILL_BITS]    = op_fill_bits<W,H>;
     ops[OP_MASK_BITS]    = op_mask_bits<W,H>;
+    ops[OP_READ]         = op_read<W,H>;
+    ops[OP_WRITE]        = op_write<W,H>;
     ops[OP_HALT]         = op_halt<W,H>;
 }
 

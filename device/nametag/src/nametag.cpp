@@ -17,7 +17,9 @@ uint32_t basic_program[] = {
     OP_PUSH, 0xFF0000, OP_FOREGROUND, OP_FILL, OP_TICK,
     OP_PUSH, 0x00FF00, OP_FOREGROUND, OP_FILL, OP_TICK,
     OP_PUSH, 0x0000FF, OP_FOREGROUND, OP_FILL, OP_TICK,
-    OP_PUSH, PROGRAM_PILES_INIT, OP_GOTO,
+    OP_PUSH, PROGRAM_MAIN, OP_GOTO,
+    OP_HALT, OP_HALT,
+//    OP_PUSH, PROGRAM_PILES_INIT, OP_GOTO,
 
     OP_SUB, PROGRAM_PILES_INIT,
 
@@ -427,7 +429,7 @@ void NameTag::start() {
 //    }
 
     web_server.begin();
-    vm.begin();
+    vm->begin();
 }
 
 void NameTag::tick() {
@@ -445,4 +447,88 @@ void NameTag::tick() {
 //    }
 //
 //    matrix.draw();
+    //logf_ln("D [nametag] TICK");
+
+    if (vm->has_halted()) {
+        logf_ln("W [nametag] VM halt detected, returning to built-in program");
+
+        if (web_binary) {
+            delete web_binary;
+            web_binary = 0;
+            this->remove_post_ticker(vm);
+            delete vm;
+        }
+
+        vm = &builtin;
+        vm->begin();
+        this->add_post_ticker(vm);
+    }
+}
+
+bool NameTag::handle_web_request(mysook::Request &req, mysook::Response &res) {
+    const String &body = req.body();
+    if (body.length() < 16) {
+        res.status(400, "Bad Request");
+        res.header("Content_Type", "text/plain");
+        res.body("Program descriptors must be at least 16 bytes long.");
+        return true;
+    }
+
+    if (body.length() % 4 != 0) {
+        res.status(400, "Bad Request");
+        res.header("Content-Type", "text/plain");
+        res.body("Program descriptors must be provided in 4 byte increments.");
+        return true;
+    }
+
+    uint32_t *binary = new uint32_t[ 2 + body.length() / 4 ];
+
+    int i = 0;
+    for (int c = 0; c < body.length(); ++c) {
+        char ch = body.charAt(c);
+        //logf_ln("READ %02X", ch);
+        switch (c % 4) {
+        case 0:
+            binary[i] = ch << 0x18;
+            break;
+        case 1:
+            binary[i] |= ch << 0x10;
+            break;
+        case 2:
+            binary[i] |= ch << 0x08;
+            break;
+        case 3:
+            binary[i] |= ch;
+            //logf_ln("0x%08X", binary[i]);
+            ++i;
+            break;
+        }
+    }
+
+    binary[i++] = OP_HALT;
+    binary[i++] = OP_HALT;
+
+    this->remove_post_ticker(vm);
+
+    if (web_binary) {
+        logf_ln("I [nametag] stopping existng web program");
+
+        delete vm;
+        delete web_binary;
+    }
+
+    logf_ln("I [nametag] starting new web program");
+
+    uint32_t start    = binary[0];
+    uint32_t *program = binary + 1;
+
+    web_binary  = binary;
+    vm = new VM<12,6>(this->log, matrix, program, start);
+    vm->begin();
+    this->add_post_ticker(vm);
+
+    String OK("OK");
+    res.status(200, OK);
+    
+    return true;
 }
