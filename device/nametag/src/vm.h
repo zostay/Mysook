@@ -156,7 +156,7 @@ public:
         case REG_URGENCY:
             _tick_speed = hertz(val);
             this->nudge_tick();
-            log.logf_ln("I [vm] tick_speed = %ld", _tick_speed);
+            //log.logf_ln("I [vm] tick_speed = %ld", _tick_speed);
             break;
 
         case REG_BRIGHTNESS: 
@@ -187,6 +187,7 @@ public:
             return 0;
         }
 
+        //log.logf_ln("T [vm] <PP:%08X> READ %d -> %d", program_ptr, stack_ptr, stack[stack_ptr]);
         return stack[stack_ptr];
     }
 
@@ -198,6 +199,7 @@ public:
             return;
         }
 
+        //log.logf_ln("T [vm] <PP:%08X> WRITE %d <- %d", program_ptr, stack_ptr, val);
         stack[stack_ptr] = val;
     }
 
@@ -296,12 +298,11 @@ void VM<W,H>::step_exec() {
     auto tick_mode_op = op_codes.at(OP_TICK);
     bool in_tick_mode = false;
 
-    //log.logf_ln("T [vm] <PP:%08X> STACK %d", program_ptr, stack_ptr);
-
     switch (mode) {
     case MODE_NONE:
         {
             uint32_t s = step();
+
             //if (s == OP_PUSH) {
             //    log.logf_ln("T [vm] <PP:%08X> EXEC %08X %08X", program_ptr-2, s, peek_step());
             //}
@@ -362,14 +363,14 @@ void VM<W,H>::step_exec() {
         }
     }
 
-    String stack_str;
-    bool first = true;
-    for (int i = 0; i < stack_ptr; ++i) {
-        if (!first) stack_str += ", ";
-        stack_str += String(stack[i]);
-        first = false;
-    }
-    //log.logf_ln("D [vm] stack: %s", stack_str.c_str());
+    //String stack_str;
+    //bool first = true;
+    //for (int i = 0; i < stack_ptr; ++i) {
+    //    if (!first) stack_str += ", ";
+    //    stack_str += String(stack[i]);
+    //    first = false;
+    //}
+    //log.logf_ln("T [vm] <PP:%08X> STACK: %s", stack_str.c_str());
 }
 
 template <int W, int H>
@@ -379,7 +380,7 @@ void VM<W,H>::tick_exec() {
     reset_tick();
     while (!has_ticked() && !has_halted()) step_exec();
 
-    log.logf_ln("I [vm] Tick!");
+    //log.logf_ln("I [vm] Tick!");
 }
 
 template <int W, int H>
@@ -666,8 +667,9 @@ void op_swap(VM<W,H> &p) {
     p.push(b);
 }
 
-OP_UNARY_EXPR(read, p.read_stack(REG_STACK_SEGMENT + a))
-OP_BINARY_STMT(write, p.write_stack(REG_STACK_SEGMENT + a, b))
+OP_UNARY_EXPR(read, p.read_stack(p.get_register(REG_STACK_SEGMENT) + a))
+OP_BINARY_STMT(write, p.write_stack(p.get_register(REG_STACK_SEGMENT) + a, b))
 OP_BINARY_STMT(alloc, p.allocate_stack(a, b))
+OP_UNARY_EXPR(readarg, p.read_stack(p.get_register(REG_STACK_SEGMENT) - a - 2))
 
 #endif//__VM_H

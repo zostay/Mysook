@@ -76,6 +76,7 @@ enum VMOp is export (
     OP_READ            => 0x80C8,
     OP_WRITE           => 0x80C9,
     OP_ALLOC           => 0x00CA,
+    OP_READARG         => 0x80CB,
 );
 
 enum VMRegister is export (
@@ -158,6 +159,7 @@ class FrameStack {
     method push() { @!frames.push: Frame.new; return; }
     method pop() { @!frames.pop; return; }
 
+    method push-arg() { @!frames[*-1].push-arg() }
     method allocate(Str $name) { @!frames[*-1].allocate($name) }
     method lookup(Str $name) { @!frames[*-1].lookup($name) }
     method end-decls() { @!frames[*-1].end-decls() }
@@ -188,6 +190,16 @@ class ProgramBuilder {
         $!frame.pop;
 
         self.ops: OP_RETURN;
+    }
+
+    method arg(Expression $) { }
+
+    method call(Str $name) {
+        self.ops: OP_PUSH, $!codex.lookup($name), OP_GOSUB;
+    }
+
+    method pop() {
+        self.ops: OP_POP;
     }
 
     method global(Str $name, Int $value = 0) {
@@ -253,6 +265,11 @@ class ProgramBuilder {
         Expression;
     }
 
+    method read-arg(Int $num where $num < 0) {
+        self.ops: OP_PUSH, -$num, OP_READARG;
+        Expression;
+    }
+
     method rand() { self.decls: OP_RAND; Expression }
     method width() { self.decls: OP_WIDTH; Expression }
     method height() { self.decls: OP_HEIGHT; Expression }
@@ -276,24 +293,33 @@ class ProgramBuilder {
 
     method loop(&block) {
         my $begin-loop = $!codex.jump-point;
+        my $end-loop = $!codex.jump-point;
 
         self.ops: OP_SUB, $begin-loop;
-        block(self);
+        block(self, :$end-loop);
         self.ops: OP_PUSH, $begin-loop, OP_GOTO;
+        self.ops: OP_SUB, $end-loop;
     }
 
-    method for(Range $range, Str $counter, &block, Bool :$local = False) {
-        my ($index, $read-op, $write-op);
-        if $local {
-            $index = $!frame.lookup($counter);
-            $read-op = OP_READ;
-            $write-op = OP_WRITE;
-        }
-        else {
-            $index = $!heap.lookup($counter);
-            $read-op = OP_GET;
-            $write-op = OP_SET;
-        }
+    multi method for(Expression $, Expression $, Str $counter, &block) {
+        my ($index, $read-op, $write-op) = self!lookup($counter);
+
+        my $begin-loop = $!codex.jump-point;
+
+        self.ops: OP_SWAP, OP_PUSH, $index, $write-op;
+        self.ops: OP_SUB, $begin-loop;
+        self.ops: OP_DUP;
+        block(self, :$index, :$read-op, :$write-op);
+        self.ops: OP_PUSH, $index, $read-op;
+        self.ops: OP_PUSH, 1, OP_ADD;
+        self.ops: OP_DUP, OP_PUSH, $index, $write-op;
+        self.ops: OP_SWAP, OP_LE;
+        self.ops: OP_PUSH, $begin-loop, OP_CMP;
+        self.ops: OP_POP;
+    }
+
+    multi method for(Range $range, Str $counter, &block) {
+        my ($index, $read-op, $write-op) = self!lookup($counter);
 
         my ($n, $x) = $range.int-bounds;
 

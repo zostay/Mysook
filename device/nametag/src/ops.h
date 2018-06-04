@@ -97,6 +97,7 @@ enum VMOp {
     OP_MASK_BITS    = 0x80B1,
     OP_READ         = 0x80C8,
     OP_WRITE        = 0x80C9,
+    OP_READARG      = 0x80CB,
     OP_HALT         = 0xDEAD,
 };
 
@@ -162,6 +163,7 @@ template <int W, int H> void op_fill_bits(VM<W,H> &);
 template <int W, int H> void op_mask_bits(VM<W,H> &);
 template <int W, int H> void op_read(VM<W,H> &);
 template <int W, int H> void op_write(VM<W,H> &);
+template <int W, int H> void op_readarg(VM<W,H> &);
 template <int W, int H> void op_halt(VM<W,H> &);
 
 template <int W, int H>
@@ -216,6 +218,7 @@ OpCodes<W,H>::OpCodes() {
     ops[OP_MASK_BITS]    = op_mask_bits<W,H>;
     ops[OP_READ]         = op_read<W,H>;
     ops[OP_WRITE]        = op_write<W,H>;
+    ops[OP_READARG]      = op_readarg<W,H>;
     ops[OP_HALT]         = op_halt<W,H>;
 }
 
