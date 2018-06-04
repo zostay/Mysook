@@ -203,9 +203,9 @@ class ProgramBuilder {
         self.ops: @args.map({ OP_POP });
     }
 
-    method pop() {
-        self.ops: OP_POP;
-    }
+    method pop() { self.ops: OP_POP; }
+    method halt() { self.ops: OP_HALT; }
+    method return() { self.ops: OP_RETURN; }
 
     method global(Str $name, Int $value = 0) {
         my $reg = $!heap.allocate($name);
@@ -422,3 +422,7 @@ multi infix:«<» (Expression $a, Expression $b)  is export { $*ntpb.decls: OP_L
 multi infix:«<=» (Expression $a, Expression $b) is export { $*ntpb.decls: OP_LE; Expression }
 multi infix:«>» (Expression $a, Expression $b) is export { $*ntpb.decls: OP_GT; Expression }
 multi infix:«>=» (Expression $a, Expression $b) is export { $*ntpb.decls: OP_GE; Expression }
+
+multi infix:<&> (Expression $a, Expression $b) is export { $*ntpb.decls: OP_AND; Expression }
+multi infix:<|> (Expression $a, Expression $b) is export { $*ntpb.decls: OP_OR; Expression }
+multi infix:<!> (Expression $a) is export { $*ntpb.decls: OP_NOT; Expression }
