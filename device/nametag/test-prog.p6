@@ -47,11 +47,10 @@ my $program = program {
 
             .set: "grid", .get("xy"), .get("grid", .get("xy")) + .num(1);
 
-            .arg: .get("grid", .get("xy"));
-            .arg: .get("y");
-            .arg: .get("x");
-            .call: "update-pixel";
-            .pop; .pop; .pop;
+            .call: "update-pixel",
+                .get("grid", .get("xy")),
+                .get("y"),
+                .get("x");
 
             .set: "y", 0;
             .loop: -> $_, :end-loop($end-loop-y) {
@@ -75,44 +74,40 @@ my $program = program {
                             .set: "xy", .get("x") - .num(1) + .get("y") * .width;
                             .set: "grid", .get("xy"), .get("grid", .get("xy")) + .num(1);
 
-                            .arg: .get("grid", .get("xy"));
-                            .arg: .get("y");
-                            .arg: .get("x") - .num(1);
-                            .call: "update-pixel";
-                            .pop; .pop; .pop;
+                            .call: "update-pixel",
+                                .get("grid", .get("xy")),
+                                .get("y"),
+                                .get("x") - .num(1);
                         }
 
                         .if: .get("y") > .num(0), {
                             .set: "xy", .get("x") + (.get("y") - .num(1)) * .width;
                             .set: "grid", .get("xy"), .get("grid", .get("xy")) + .num(1);
 
-                            .arg: .get("grid", .get("xy"));
-                            .arg: .get("y") - .num(1);
-                            .arg: .get("x");
-                            .call: "update-pixel";
-                            .pop; .pop; .pop;
+                            .call: "update-pixel",
+                                .get("grid", .get("xy")),
+                                .get("y") - .num(1),
+                                .get("x");
                         }
 
                         .if: .get("x") < .width - .num(1), {
                             .set: "xy", .get("x") + .num(1) + .get("y") * .width;
                             .set: "grid", .get("xy"), .get("grid", .get("xy")) + .num(1);
 
-                            .arg: .get("grid", .get("xy"));
-                            .arg: .get("y");
-                            .arg: .get("x") + .num(1);
-                            .call: "update-pixel";
-                            .pop; .pop; .pop;
+                            .call: "update-pixel",
+                                .get("grid", .get("xy")),
+                                .get("y"),
+                                .get("x") + .num(1);
                         }
 
                         .if: .get("y") < .height - .num(1), {
                             .set: "xy", .get("x") + (.get("y") + .num(1)) * .width;
                             .set: "grid", .get("xy"), .get("grid", .get("xy")) + .num(1);
 
-                            .arg: .get("grid", .get("xy"));
-                            .arg: .get("y") + .num(1);
-                            .arg: .get("x");
-                            .call: "update-pixel";
-                            .pop; .pop; .pop;
+                            .call: "update-pixel",
+                                .get("grid", .get("xy")),
+                                .get("y") + .num(1),
+                                .get("x");
                         }
                     }
 

@@ -194,8 +194,13 @@ class ProgramBuilder {
 
     method arg(Expression $) { }
 
-    method call(Str $name) {
+    method call(Str $name, *@args) {
+        for @args {
+            when Expression { }
+            default { self.ops: OP_PUSH, $_; }
+        }
         self.ops: OP_PUSH, $!codex.lookup($name), OP_GOSUB;
+        self.ops: @args.map({ OP_POP });
     }
 
     method pop() {
