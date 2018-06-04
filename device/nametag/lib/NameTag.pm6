@@ -233,7 +233,7 @@ class ProgramBuilder {
 
     multi method set(Str $name, Expression $) {
         my ($base, $, $write) = self!lookup($name);
-        self.ops: OP_SWAP, OP_PUSH, $base, $write;
+        self.ops: OP_PUSH, $base, $write;
     }
 
     multi method set(Str $name, Expression $, Expression $) {
@@ -330,14 +330,33 @@ class ProgramBuilder {
         self.ops: OP_TICK;
     }
 
-    method goto(Str $name) {
+    multi method goto(Str $name) {
         self.ops: OP_PUSH, $!codex.lookup($name), OP_GOTO;
     }
 
-    method bytes() {
-        dd $!start;
-        dd @!program;
+    multi method goto(Int $jump-point) {
+        self.ops: OP_PUSH, $jump-point, OP_GOTO;
+    }
 
+    method dump() {
+        my $pp = 0;
+        my $str-width = [max] VMOp.enums.keys».chars;
+        join "\n", gather while $pp < @!program.elems {
+            my $op = @!program[ $pp ];
+
+            if $op == OP_SUB | OP_PUSH {
+                my $val = @!program[ $pp + 1 ];
+                take sprintf "<PP:%08X> EXEC (%08X) %-{$str-width}s %08X", $pp, $op, $op, $val;
+                $pp += 2;
+            }
+            else {
+                take sprintf "<PP:%08X> EXEC (%08X) %-{$str-width}s", $pp, $op, $op;
+                $pp++;
+            }
+        }
+    }
+
+    method bytes() {
         my @bytes;
         for flat $!start, @!program -> $dword {
             @bytes.append: (
@@ -355,7 +374,7 @@ class ProgramBuilder {
 sub program(&block) is export {
     my $*ntpb = my $builder = NameTag::ProgramBuilder.new;
     block($builder);
-    $builder.bytes;
+    $builder;
 }
 
 multi infix:<*> (Expression $a, Expression $b) is export { $*ntpb.decls: OP_MUL; Expression }

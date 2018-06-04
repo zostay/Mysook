@@ -8,7 +8,7 @@ use HTTP::Request::Common;
 constant PROGRAM_MAIN = 1;
 constant LOOP_MAIN = 2;
 
-my $content = program {
+my $program = program {
     .fun: "MAIN", {
         .local: "i";
         .set-urgency: 5;
@@ -30,70 +30,78 @@ my $content = program {
         .local: "xy", 0;
         .local-array: "grid", .width * .height, .num(0);
 
-        .set: "x", .rand;
-        .set: "y", .rand;
-        .set: "xy", .get("x") + .get("y") * .width;
+        .loop: -> $_, *%_ {
+            .set: "x", .rand % .width;
+            .set: "y", .rand % .height;
+            .set: "xy", .get("x") + .get("y") * .width;
 
-        .set: "grid", .get("xy"), .get("grid", .get("xy")) + .num(1);
+            .set: "grid", .get("xy"), .get("grid", .get("xy")) + .num(1);
 
-        .set: "y", 0;
-        .loop: {
-            .set: "x", 0;
-
-            .loop: {
-                .set: "xy", .get("x") + .get("y") * .width;
-
-                .if: .get("grid", .get("xy")) == .num(0), {
-                    .set-foreground: 0x000000;
+            .set: "y", 0;
+            .loop: -> $_, :end-loop($end-loop-y) {
+                .if: .get("y") >= .height, {
+                    .goto: $end-loop-y;
                 }
 
-                .if: .get("grid", .get("xy")) == .num(1), {
-                    .set-foreground: 0x0000FF;
-                }
+                .set: "x", 0;
 
-                .if: .get("grid", .get("xy")) == .num(2), {
-                    .set-foreground: 0xFFFF00;
-                }
-
-                .if: .get("grid", .get("xy")) == .num(3), {
-                    .set-foreground: 0xFF0000;
-                }
-
-                .pixel: .get("x"), .get("y");
-
-                .if: .get("grid", .get("xy")) >= .num(4), {
-                    .set: "grid", .get("xy"), .num(0);
-
-                    .if: .get("x") > .num(0), {
-                        .set: "xy", .get("x") - .num(1) + .get("y") * .width;
-                        .set: "grid", .get("xy"), .get("grid", .get("xy")) + .num(1);
+                .loop: -> $_, :end-loop($end-loop-x) {
+                    .if: .get("x") >= .width, {
+                        .goto: $end-loop-x;
                     }
 
-                    .if: .get("y") > .num(0), {
-                        .set: "xy", .get("x") + (.get("y") - .num(1)) * .width;
-                        .set: "grid", .get("xy"), .get("grid", .get("xy")) + .num(1);
+                    .set: "xy", .get("x") + .get("y") * .width;
+
+                    .if: .get("grid", .get("xy")) == .num(0), {
+                        .set-foreground: 0x000000;
                     }
 
-                    .if: .get("x") < .width - .num(1), {
-                        .set: "xy", .get("x") + .num(1) + .get("y") * .width;
-                        .set: "grid", .get("xy"), .get("grid", .get("xy")) + .num(1);
+                    .if: .get("grid", .get("xy")) == .num(1), {
+                        .set-foreground: 0x0000FF;
                     }
 
-                    .if: .get("y") < .height - .num(1), {
-                        .set: "xy", .get("x") + (.get("y") + .num(1)) * .width;
-                        .set: "grid", .get("xy"), .get("grid", .get("xy")) + .num(1);
+                    .if: .get("grid", .get("xy")) == .num(2), {
+                        .set-foreground: 0xFFFF00;
                     }
+
+                    .if: .get("grid", .get("xy")) == .num(3), {
+                        .set-foreground: 0xFF0000;
+                    }
+
+                    .pixel: .get("x"), .get("y");
+
+                    .if: .get("grid", .get("xy")) >= .num(4), {
+                        .set: "grid", .get("xy"), .num(0);
+
+                        .if: .get("x") > .num(0), {
+                            .set: "xy", .get("x") - .num(1) + .get("y") * .width;
+                            .set: "grid", .get("xy"), .get("grid", .get("xy")) + .num(1);
+                        }
+
+                        .if: .get("y") > .num(0), {
+                            .set: "xy", .get("x") + (.get("y") - .num(1)) * .width;
+                            .set: "grid", .get("xy"), .get("grid", .get("xy")) + .num(1);
+                        }
+
+                        .if: .get("x") < .width - .num(1), {
+                            .set: "xy", .get("x") + .num(1) + .get("y") * .width;
+                            .set: "grid", .get("xy"), .get("grid", .get("xy")) + .num(1);
+                        }
+
+                        .if: .get("y") < .height - .num(1), {
+                            .set: "xy", .get("x") + (.get("y") + .num(1)) * .width;
+                            .set: "grid", .get("xy"), .get("grid", .get("xy")) + .num(1);
+                        }
+                    }
+
+                    .set: "x", .get("x") + .num(1);
                 }
 
-                .set: "x", .get("x") + .num(1);
+                .set: "y", .get("y") + .num(1);
             }
 
-            .set: "y", .get("x") + .num(1);
+            .tick;
         }
-
-        .tick;
-
-        .goto: "piles";
     }
 
     .start: "piles";
@@ -120,7 +128,10 @@ my $content = program {
 sub MAIN(:host($nametag)!) {
     my $ua = HTTP::UserAgent.new;
 
-    dd $content;
+    #dd $content;
+
+    say $program.dump();
+    my $content = $program.bytes;
 
     my $req = POST("http://$nametag/", :$content);
     my $res = $ua.request($req);

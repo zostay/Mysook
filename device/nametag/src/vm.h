@@ -91,6 +91,11 @@ public:
         return program[ program_ptr++ ]; 
     }
 
+    uint32_t peek_step() {
+        if (halted) return OP_HALT;
+        return program[ program_ptr ]; 
+    }
+
     void step_exec();
     void tick_exec();
 
@@ -211,10 +216,13 @@ public:
     using mysook::RGBPanel<W,H>::set_fg;
     using mysook::RGBPanel<W,H>::set_bg;
 
-    virtual void put_pixel(int x, int y, mysook::Color c) { panel.put_pixel(x, y, c); }
+    virtual void put_pixel(int x, int y, mysook::Color c) { 
+        //log.logf_ln("D [vm] put pixel (%d, %d) <- (%d, %d, %d)", x, y, c.r, c.g, c.b);
+        panel.put_pixel(x, y, c); 
+    }
     virtual void set_brightness(uint8_t brightness) { panel.set_brightness(brightness); }
     virtual void fill_screen(mysook::Color c) { 
-        log.logf_ln("D [vm] filling screen (%d, %d, %d)", c.r, c.g, c.b);
+        //log.logf_ln("D [vm] filling screen (%d, %d, %d)", c.r, c.g, c.b);
         panel.fill_screen(c); 
     }
     virtual void put_char(unsigned char c, int x, int y, mysook::Color fg, mysook::Color bg) { panel.put_char(c, x, y, fg, bg); }
@@ -288,10 +296,18 @@ void VM<W,H>::step_exec() {
     auto tick_mode_op = op_codes.at(OP_TICK);
     bool in_tick_mode = false;
 
+    //log.logf_ln("T [vm] <PP:%08X> STACK %d", program_ptr, stack_ptr);
+
     switch (mode) {
     case MODE_NONE:
         {
             uint32_t s = step();
+            //if (s == OP_PUSH) {
+            //    log.logf_ln("T [vm] <PP:%08X> EXEC %08X %08X", program_ptr-2, s, peek_step());
+            //}
+            //else {
+            //    log.logf_ln("T [vm] <PP:%08X> EXEC %08X", program_ptr-2, s);
+            //}
 
             try {
                 auto op_code = op_codes.at(s);
@@ -308,21 +324,25 @@ void VM<W,H>::step_exec() {
     case MODE_BRIGHTNESS:
         in_tick_mode = true;
         tick_mode_op = op_codes.at(OP_BRIGHTNESS);
+        //log.logf_ln("T [vm] <PP:%08X> EXEC %08X", program_ptr, OP_BRIGHTNESS);
         break;
 
     case MODE_MASK_ROWS:
         in_tick_mode = true;
         tick_mode_op = op_codes.at(OP_MASK_ROWS);
+        //log.logf_ln("T [vm] <PP:%08X> EXEC %08X", program_ptr, OP_MASK_ROWS);
         break;
 
     case MODE_MASK_COLUMNS:
         in_tick_mode = true;
         tick_mode_op = op_codes.at(OP_MASK_COLUMNS);
+        //log.logf_ln("T [vm] <PP:%08X> EXEC %08X", program_ptr, OP_MASK_COLUMNS);
         break;
 
     case MODE_MASK_BITS:
         in_tick_mode = true;
         tick_mode_op = op_codes.at(OP_MASK_BITS);
+        //log.logf_ln("T [vm] <PP:%08X> EXEC %08X", program_ptr, OP_MASK_BITS);
         break;
 
     default:
@@ -372,6 +392,7 @@ uint32_t VM<W,H>::pop() {
     }
     else {
         registers[REG_MARK]--;
+        //log.logf_ln("T [vm] <PP:%08X> POP %08X", program_ptr, stack[ stack_ptr - 1 ]);
         return stack[ --stack_ptr ];
     }
 }
@@ -385,6 +406,7 @@ void VM<W,H>::push(uint32_t v) {
     }
     else {
         registers[REG_MARK]++;
+        //log.logf_ln("T [vm] <PP:%08X> PUSH %08X", program_ptr, v);
         stack[ stack_ptr++ ] = v;
     }
 }
@@ -644,7 +666,7 @@ void op_swap(VM<W,H> &p) {
     p.push(b);
 }
 
-OP_UNARY_STMT(read, p.read_stack(REG_STACK_SEGMENT + a))
+OP_UNARY_EXPR(read, p.read_stack(REG_STACK_SEGMENT + a))
 OP_BINARY_STMT(write, p.write_stack(REG_STACK_SEGMENT + a, b))
 OP_BINARY_STMT(alloc, p.allocate_stack(a, b))
 
