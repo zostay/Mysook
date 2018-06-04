@@ -1,5 +1,4 @@
 use v6;
-use NameTag;
 
 program {
     .fun: "update-pixel", {
@@ -33,7 +32,7 @@ program {
         .set-foreground: 0x000000;
         .fill;
 
-        .loop: -> $_, *%_ {
+        .loop: -> $_, *% {
             .set: "x", .rand % .width;
             .set: "y", .rand % .height;
             .set: "xy", .get("x") + .get("y") * .width;

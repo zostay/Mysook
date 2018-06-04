@@ -369,6 +369,12 @@ class ProgramBuilder {
         self.ops: OP_PUSH, $jump-point, OP_GOTO;
     }
 
+    method tick-mode(VMTickMode $mode, @data) {
+        self.ops: OP_MARK;
+        self.ops: OP_PUSH, $_ for @data.reverse;
+        self.ops: OP_PUSH, $mode, OP_TICK_MODE;
+    }
+
     method dump() {
         my $pp = 0;
         my $str-width = [max] VMOp.enums.keys».chars;
