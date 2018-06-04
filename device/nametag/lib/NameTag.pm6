@@ -395,6 +395,8 @@ class ProgramBuilder {
 
         buf8.new(@bytes);
     }
+
+    method program-ops() { |@!program, OP_HALT, OP_HALT }
 }
 
 sub program(&block) is export {
