@@ -69,7 +69,11 @@ enum VMOp {
     OP_MOD          = 0x0035,
     OP_AND          = 0x0041,
     OP_OR           = 0x0042,
-    OP_NOT          = 0x0043,
+    OP_XOR          = 0x0043,
+    OP_NOT          = 0x0044,
+    OP_BSL          = 0x0045,
+    OP_BSR          = 0x0046,
+    OP_COMP         = 0x0047,
     OP_RAND         = 0x0051,
     OP_WIDTH        = 0x0052,
     OP_HEIGHT       = 0x0053,
@@ -135,7 +139,11 @@ template <int W, int H> void op_div(VM<W,H> &);
 template <int W, int H> void op_mod(VM<W,H> &);
 template <int W, int H> void op_and(VM<W,H> &);
 template <int W, int H> void op_or(VM<W,H> &);
+template <int W, int H> void op_xor(VM<W,H> &);
 template <int W, int H> void op_not(VM<W,H> &);
+template <int W, int H> void op_bsl(VM<W,H> &);
+template <int W, int H> void op_bsr(VM<W,H> &);
+template <int W, int H> void op_comp(VM<W,H> &);
 template <int W, int H> void op_rand(VM<W,H> &);
 template <int W, int H> void op_width(VM<W,H> &);
 template <int W, int H> void op_height(VM<W,H> &);
@@ -190,7 +198,11 @@ OpCodes<W,H>::OpCodes() {
     ops[OP_MOD]          = op_mod<W,H>;
     ops[OP_AND]          = op_and<W,H>;
     ops[OP_OR]           = op_or<W,H>;
+    ops[OP_XOR]          = op_xor<W,H>;
     ops[OP_NOT]          = op_not<W,H>;
+    ops[OP_BSL]          = op_bsl<W,H>;
+    ops[OP_BSR]          = op_bsr<W,H>;
+    ops[OP_COMP]         = op_comp<W,H>;
     ops[OP_RAND]         = op_rand<W,H>;
     ops[OP_WIDTH]        = op_width<W,H>;
     ops[OP_HEIGHT]       = op_height<W,H>;

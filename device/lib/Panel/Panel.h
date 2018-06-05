@@ -1,6 +1,7 @@
 #ifndef __PANEL_H
 #define __PANEL_H
 
+#include <Canvas32.h>
 #include <Color.h>
 
 namespace mysook {
@@ -82,44 +83,89 @@ protected:
     Color fg = Color(255, 255, 255);
     Color bg = Color(0, 0, 0);
     Point cursor = Point(0, 0);
+
+
 };
 
 template <int W, int H>
 class RGBPanelGrid : public RGBPanel<W,H> {
 protected:
     uint8_t brightness = 255;
-    Color grid[W][H];
+    Canvas32 grid;
 
 public:
-    virtual Color get_pixel(int x, int y) { return grid[x][y]; }
+    using RGBPanel<W,H>::put_pixel;
+    using RGBPanel<W,H>::fill_screen;
+    using RGBPanel<W,H>::put_char;
+    using RGBPanel<W,H>::put_text;
+
+    using RGBPanel<W,H>::set_fg;
+    using RGBPanel<W,H>::set_bg;
+    using RGBPanel<W,H>::set_brightness;
+
+    RGBPanelGrid() : grid(W, H) { }
+
     virtual void put_pixel(int x, int y, Color c) {
-        grid[x][y] = c;
+        grid.setPassthruColor(c.truecolor());
+        grid.drawPixel(x, y, 0);
+        grid.setPassthruColor();
     }
 
     virtual void set_brightness(uint8_t brightness) {
         this->brightness = brightness;
     }
 
-    virtual void fill_screen(Color c);
+    virtual void fill_screen(Color c) {
+        grid.setPassthruColor(c.truecolor());
+        grid.fillScreen(0);
+        grid.setPassthruColor();
+    }
 
     virtual void put_char(unsigned char c, int x, int y, Color fg, Color bg) {
-        // NYI
+        char text[2] = { c, '\0' };
+        put_text(text, x, y, fg, bg);
     }
 
-    virtual void put_text(const char *t, int x, int y, Color fg, Color bg) {
-        // NYI
+    virtual void put_text(const char *text, int x, int y, Color fg, Color bg) {
+        grid.setCursor(x, y);
+        grid.setTextColor(
+            grid.Color(fg.r, fg.g, fg.b),
+            grid.Color(bg.r, bg.g, bg.b)
+        );
+        grid.print(text);
+        this->set_cursor(
+            grid.getCursorX(),
+            grid.getCursorY()
+        );
     }
+
+    uint32_t *get_buffer() { return grid.getBuffer(); }
+
+    virtual void draw() { }
 };
 
-template <int W, int H> 
-void RGBPanelGrid<W,H>::fill_screen(Color c) {
-    for (int y = 0; y < H; ++y) {
-        for (int x = 0; x < W; ++x) {
-            grid[x][y] = c;
-        }
-    }
-}
+template <int W, int H>
+class RGBPanelBackBuffer : public RGBPanelGrid<W,H> {
+protected:
+    RGBPanel<W,H> &panel;
 
+public:
+    RGBPanelBackBuffer(RGBPanel<W,H> &panel) : panel(panel) {}
+
+    // Draw = Flip
+    virtual void draw() { 
+        uint32_t *buf = this->grid.getBuffer();
+
+        int i = 0;
+        for (int y = 0; y < H; ++y) {
+            for (int x = 0; x < W; ++x) {
+                panel.put_pixel(x, y, Color(buf[++i]));
+            }
+        }
+
+        panel.draw();
+    }
+};
 };
 
 #endif//__PANEL_H

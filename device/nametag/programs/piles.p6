@@ -31,6 +31,7 @@ program {
         .set-urgency: 1;
         .set-foreground: 0x000000;
         .fill;
+        .tick;
 
         .loop: -> $_, *% {
             .set: "x", .rand % .width;
@@ -112,7 +113,6 @@ program {
             .tick;
         }
     }
-
 
     .start: "piles";
 }

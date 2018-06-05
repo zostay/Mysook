@@ -41,7 +41,11 @@ enum VMOp is export (
 
     OP_AND             => 0x0041,
     OP_OR              => 0x0042,
-    OP_NOT             => 0x0043,
+    OP_XOR             => 0x0043,
+    OP_NOT             => 0x0044,
+    OP_BSL             => 0x0045,
+    OP_BSR             => 0x0046,
+    OP_COMP            => 0x0047,
 
     OP_RAND            => 0x0051,
     OP_WIDTH           => 0x0052,
@@ -330,7 +334,7 @@ class ProgramBuilder {
 
         my $begin-loop = $!codex.jump-point;
 
-        self.ops: OP_PUSH, $n, OP_PUSH, $index, $read-op;
+        self.ops: OP_PUSH, $n, OP_PUSH, $index, $write-op;
         self.ops: OP_SUB, $begin-loop;
         block(self, :$index, :$read-op, :$write-op);
         self.ops: OP_PUSH, $index, $read-op;
@@ -341,12 +345,48 @@ class ProgramBuilder {
         self.ops: OP_PUSH, $begin-loop, OP_CMP;
     }
 
-    method set-foreground(Int $color) {
+    multi method set-foreground(Int $color) {
         self.ops: OP_PUSH, $color, OP_FOREGROUND;
+    }
+
+    multi method set-foreground(Expression $) {
+        self.ops: OP_FOREGROUND;
     }
 
     method fill() {
         self.ops: OP_FILL;
+    }
+
+    multi method fill-columns(Int $mask) {
+        self.ops: OP_PUSH, $mask, OP_FILL_COLUMNS;
+    }
+
+    multi method fill-columns(Expression $) {
+        self.ops: OP_FILL_COLUMNS;
+    }
+
+    multi method fill-rows(Int $mask) {
+        self.ops: OP_PUSH, $mask, OP_FILL_ROWS;
+    }
+
+    multi method fill-rows(Expression $) {
+        self.ops: OP_FILL_ROWS;
+    }
+
+    multi method mask-columns(Int $mask) {
+        self.ops: OP_PUSH, $mask, OP_MASK_COLUMNS;
+    }
+
+    multi method mask-columns(Expression $) {
+        self.ops: OP_MASK_COLUMNS;
+    }
+
+    multi method mask-rows(Int $mask) {
+        self.ops: OP_PUSH, $mask, OP_MASK_ROWS;
+    }
+
+    multi method mask-rows(Expression $) {
+        self.ops: OP_MASK_ROWS;
     }
 
     multi method pixel(Int $x, Int $y) {
@@ -369,11 +409,17 @@ class ProgramBuilder {
         self.ops: OP_PUSH, $jump-point, OP_GOTO;
     }
 
-    method tick-mode(VMTickMode $mode, @data) {
+    multi method tick-mode(VMTickMode $mode, @data where { .all ~~ Int }) {
         self.ops: OP_MARK;
         self.ops: OP_PUSH, $_ for @data.reverse;
         self.ops: OP_PUSH, $mode, OP_TICK_MODE;
     }
+
+    # multi method tick-mode(VMTickMode $mode, &block) {
+    #     self.ops: OP_MARK;
+    #     block(self);
+    #     self.ops: OP_PUSH, $mode, OP_TICK_MODE;
+    # }
 
     method dump() {
         my $pp = 0;
@@ -429,6 +475,10 @@ multi infix:«<=» (Expression $a, Expression $b) is export { $*ntpb.decls: OP_L
 multi infix:«>» (Expression $a, Expression $b) is export { $*ntpb.decls: OP_GT; Expression }
 multi infix:«>=» (Expression $a, Expression $b) is export { $*ntpb.decls: OP_GE; Expression }
 
-multi infix:<&> (Expression $a, Expression $b) is export { $*ntpb.decls: OP_AND; Expression }
-multi infix:<|> (Expression $a, Expression $b) is export { $*ntpb.decls: OP_OR; Expression }
-multi infix:<!> (Expression $a) is export { $*ntpb.decls: OP_NOT; Expression }
+multi infix:<+&> (Expression $a, Expression $b) is export { $*ntpb.decls: OP_AND; Expression }
+multi infix:<+|> (Expression $a, Expression $b) is export { $*ntpb.decls: OP_OR; Expression }
+multi infix:<+^> (Expression $a, Expression $b) is export { $*ntpb.decls: OP_XOR; Expression }
+multi prefix:<!> (Expression $a) is export { $*ntpb.decls: OP_NOT; Expression }
+multi infix:«+<» (Expression $a, Expression $b) is export { $*ntpb.decls: OP_BSL; Expression }
+multi infix:«+>» (Expression $a, Expression $b) is export { $*ntpb.decls: OP_BSR; Expression }
+multi prefix:<+^> (Expression $a) is export { $*ntpb.decls: OP_COMP; Expression }
