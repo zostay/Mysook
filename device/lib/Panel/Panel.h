@@ -122,17 +122,17 @@ public:
     }
 
     virtual void put_char(unsigned char c, int x, int y, Color fg, Color bg) {
-        char text[2] = { c, '\0' };
+        static char text[2] = { '\0', '\0' };
+        text[0] = c;
         put_text(text, x, y, fg, bg);
     }
 
     virtual void put_text(const char *text, int x, int y, Color fg, Color bg) {
+        //grid.setPassthruColor(fg.truecolor());
         grid.setCursor(x, y);
-        grid.setTextColor(
-            grid.Color(fg.r, fg.g, fg.b),
-            grid.Color(bg.r, bg.g, bg.b)
-        );
+        grid.setTextColor(grid.Color(fg.r, fg.g, fg.b));
         grid.print(text);
+        //grid.setPassthruColor();
         this->set_cursor(
             grid.getCursorX(),
             grid.getCursorY()

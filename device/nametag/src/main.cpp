@@ -1,6 +1,8 @@
 #ifdef ARDUINO
 #include <Adafruit_DotStarMatrix.h>
-#include <Fonts/TomThumb.h>
+//#include <Fonts/TomThumb.h>
+
+//extern const GFXfont TomThumb;
 
 #include <MC_Logger.h>
 #include <MC_Panel.h>
@@ -35,10 +37,10 @@ void setup() {
     // uncomment to have wait
     //while (!Serial) delay(500); 
 
-    Serial.println("\nDotstar Matrix Wing");
+    //Serial.println("\nDotstar Matrix Wing");
     matrix.begin();
-    matrix.setFont(&TomThumb);
-    matrix.setTextWrap(false);
+    //matrix.setFont(&TomThumb);
+    //matrix.setTextWrap(false);
 
     for (int i = 0; i < ap_config_count; ++i) {
         network.add_access_point(ap_configs[i * 2], ap_configs[i * 2 + 1]);

@@ -87,6 +87,8 @@ enum VMOp {
     OP_DUP          = 0x00C3,
     OP_SWAP         = 0x00C5,
     OP_ALLOC        = 0x00CA,
+    OP_PUTCHAR      = 0x00D1,
+    OP_SET_CURSOR   = 0x00D2,
     OP_URGENCY      = 0x0183,
     OP_BRIGHTNESS   = 0x0283,
     OP_FOREGROUND   = 0x0383,
@@ -114,6 +116,8 @@ enum VMRegister {
     REG_MASKGROUND_COLOR = 0x0005,
     REG_MARK             = 0x0006,
     REG_STACK_SEGMENT    = 0x0007,
+    REG_CURSOR_X         = 0x0008,
+    REG_CURSOR_Y         = 0x0009,
     REG_USER0            = 0x0010,
     REG_USER239          = 0x00FF,
 };
@@ -157,6 +161,8 @@ template <int W, int H> void op_pop(VM<W,H> &);
 template <int W, int H> void op_dup(VM<W,H> &);
 template <int W, int H> void op_swap(VM<W,H> &);
 template <int W, int H> void op_alloc(VM<W,H> &);
+template <int W, int H> void op_putchar(VM<W,H> &);
+template <int W, int H> void op_set_cursor(VM<W,H> &);
 template <int W, int H> void op_urgency(VM<W,H> &);
 template <int W, int H> void op_brightness(VM<W,H> &);
 template <int W, int H> void op_foreground(VM<W,H> &);
@@ -216,6 +222,8 @@ OpCodes<W,H>::OpCodes() {
     ops[OP_DUP]          = op_dup<W,H>;
     ops[OP_SWAP]         = op_swap<W,H>;
     ops[OP_ALLOC]        = op_alloc<W,H>;
+    ops[OP_PUTCHAR]      = op_putchar<W,H>;
+    ops[OP_SET_CURSOR]   = op_set_cursor<W,H>;
     ops[OP_URGENCY]      = op_urgency<W,H>;
     ops[OP_BRIGHTNESS]   = op_brightness<W,H>;
     ops[OP_FOREGROUND]   = op_foreground<W,H>;

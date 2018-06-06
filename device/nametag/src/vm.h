@@ -10,6 +10,7 @@
 #include <Panel.h>
 
 #include "ops.h"
+#include "TomThumb.h"
 
 #define STACK_SIZE 4096
 #define HEAP_SIZE  256
@@ -188,6 +189,14 @@ public:
                 halt();
             };
             break;
+
+        case REG_CURSOR_X:
+            this->mysook::RGBPanel<W,H>::set_cursor(val, get_register(REG_CURSOR_Y));
+            break;
+
+        case REG_CURSOR_Y:
+            this->mysook::RGBPanel<W,H>::set_cursor(get_register(REG_CURSOR_X), val);
+            break;
         }
     }
 
@@ -248,22 +257,12 @@ public:
     using mysook::RGBPanelGrid<W,H>::set_bg;
     using mysook::RGBPanelGrid<W,H>::set_brightness;
 
-    //virtual void put_pixel(int x, int y, mysook::Color c) { 
-    //    //log.logf_ln("D [vm] put pixel (%d, %d) <- (%d, %d, %d)", x, y, c.r, c.g, c.b);
-    //    mysook::RGBPanelGrid<W,H>::put_pixel(x, y, c); 
-    //}
+    virtual void set_cursor(int x, int y) {
+        mysook::RGBPanel<W,H>::set_cursor(x, y);
+        set_register(REG_CURSOR_X, x);
+        set_register(REG_CURSOR_Y, y);
+    }
 
-    //virtual void put_pixel(int x, int y, mysook::Color c) { 
-    //    //log.logf_ln("D [vm] put pixel (%d, %d) <- (%d, %d, %d)", x, y, c.r, c.g, c.b);
-    //    panel.put_pixel(x, y, c); 
-    //}
-    //virtual void set_brightness(uint8_t brightness) { panel.set_brightness(brightness); }
-    //virtual void fill_screen(mysook::Color c) { 
-    //    //log.logf_ln("D [vm] filling screen (%d, %d, %d)", c.r, c.g, c.b);
-    //    panel.fill_screen(c); 
-    //}
-    //virtual void put_char(unsigned char c, int x, int y, mysook::Color fg, mysook::Color bg) { panel.put_char(c, x, y, fg, bg); }
-    //virtual void put_text(const char *t, int x, int y, mysook::Color fg, mysook::Color bg) { panel.put_text(t, x, y, fg, bg); }
     virtual void draw();
 };
 
@@ -273,6 +272,9 @@ VM<W,H>::VM(mysook::Logger &log, mysook::RGBPanel<W,H> &panel, const uint32_t *p
 
 template <int W, int H>
 void VM<W,H>::begin() {
+    this->grid.setFont(&TomThumb);
+    this->grid.setTextWrap(false);
+
     halted = 0;
 
     call_index.clear();
@@ -728,5 +730,14 @@ OP_UNARY_EXPR(read, p.read_stack(p.get_register(REG_STACK_SEGMENT) + a))
 OP_BINARY_STMT(write, p.write_stack(p.get_register(REG_STACK_SEGMENT) + a, b))
 OP_BINARY_STMT(alloc, p.allocate_stack(a, b))
 OP_UNARY_EXPR(readarg, p.read_stack(p.get_register(REG_STACK_SEGMENT) - a - 2))
+
+OP_UNARY_STMT(putchar, p.put_char(a));
+
+template <int W, int H>
+void op_set_cursor(VM<W,H> &p) {
+    uint32_t a = p.pop();
+    uint32_t b = p.pop();
+    p.set_cursor(b, a);
+}
 
 #endif//__VM_H

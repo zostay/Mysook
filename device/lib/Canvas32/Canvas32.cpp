@@ -25,6 +25,9 @@ static uint32_t expandColor(uint16_t color) {
 }
 
 void Canvas32::drawPixel(int16_t x, int16_t y, uint16_t color) {
+    if (x >= this->WIDTH || x < 0) return;
+    if (y >= this->HEIGHT || y < 0) return;
+
     int xy = y * this->WIDTH + x;
     buffer[xy] = passthru_flag ? passthru : expandColor(color);
 }

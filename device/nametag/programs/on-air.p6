@@ -131,5 +131,44 @@ program {
         }
     }
 
-    .start: "police";
+    .fun: "on-air-text", {
+        .local: "marquee-pos", 0;
+
+        .set-urgency: 2;
+        .set-brightness: 30;
+
+        .loop: -> $_, *% {
+            .set: "marquee-pos", .width;
+            .loop: -> $_, :$end-loop {
+                .set-foreground: 0x000000;
+                .fill;
+
+                .set-foreground: 0xFF000;
+
+                .set-cursor: .get("marquee-pos"), .num(5);
+                .put-text: "ONAIR";
+
+                .set: "marquee-pos", .get("marquee-pos") - .num(1);
+
+                .tick;
+
+                # these are all uint32_ts inside the VM, so fake in
+                # 2s-compliment
+                .if: .get(REG_CURSOR_X) > .num(0x80000000), {
+                    .goto: $end-loop;
+                }
+            }
+
+            .tick;
+            .tick;
+            .tick;
+            .tick;
+        }
+
+        .loop:  -> $_, *% {
+            .tick;
+        }
+    }
+
+    .start: "on-air-text";
 }

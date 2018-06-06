@@ -5,7 +5,9 @@
 
 class Canvas32 : public Adafruit_GFX {
 public:
-    Canvas32(uint16_t w, uint16_t h) : Adafruit_GFX(w, h) { buffer = new uint32_t[w * h]; }
+    Canvas32(uint16_t w, uint16_t h) : Adafruit_GFX(w, h) { 
+        buffer = new uint32_t[w * h]; 
+    }
     ~Canvas32() { delete[] buffer; }
 
     void drawPixel(int16_t x, int16_t y, uint16_t color);
