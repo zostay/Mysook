@@ -18,6 +18,8 @@
 #define PANEL_WIDTH 12
 #define PANEL_HEIGHT 6
 
+#define MAX_BRIGHTNESS 75
+
 template <int W, int H>
 void op_mask_columns(VM<W,H> &);
 template <int W, int H>
@@ -169,7 +171,7 @@ public:
 
         case REG_BRIGHTNESS: 
             {
-                uint8_t capped = val > 50 ? 50 : val;
+                uint8_t capped = val > MAX_BRIGHTNESS ? MAX_BRIGHTNESS : val;
                 set_brightness(capped); 
             }
             break;
