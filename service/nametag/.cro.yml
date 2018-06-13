@@ -1,0 +1,15 @@
+---
+name: nametag
+cro: 1
+id: nametag
+env:  []
+links:  []
+entrypoint: service.p6
+endpoints: 
+  - 
+    port-env: NAMETAG_PORT
+    name: HTTP
+    protocol: http
+    host-env: NAMETAG_HOST
+    id: http
+...

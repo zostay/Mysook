@@ -1,0 +1,43 @@
+#!/usr/bin/env perl6
+use v6;
+
+use Base64;
+use JSON::Tiny;
+use HTTP::UserAgent;
+
+my $ua = HTTP::UserAgent.new;
+my $BASE-URL = 'https://nametag.zostay.com';
+
+multi MAIl('program', :$name!, :$author!, :$base-url = $BASE-URL) {
+    my $p6-program = $*ARGFILES.slurp;
+
+    my $blob-program = do {
+        use MONKEY-SEE-NO-EVAL;
+        use NameTag;
+        $pt-program.EVAL;
+    }
+
+    my $res = $ua.post("$BASE-URL/program",
+        Content-Type => 'application/json',
+        Content => to-json(%(
+            name => $name,
+            author => $author,
+            program => encode-base64($blob-program, :str),
+        )),
+    );
+
+    if $req.is-success {
+        my $created = from-json($req.body);
+        say "Program $created<id>";
+    }
+    else {
+        if $req.header('Content-Type') eq 'application/json' {
+            my $error = from-json($req.body);
+            note "$error<field>: $error<message>"
+                if $error ~~ Hash && ($error<field> && $error<message>));
+        }
+        else {
+            note "UNKNOWN ERROR: $req.body()";
+        }
+    }
+}
