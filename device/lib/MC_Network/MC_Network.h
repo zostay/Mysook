@@ -8,6 +8,7 @@
 
 #define MAX_CONNECTION_MEMORY 10
 #define CONNECTION_TIMEOUT 30000000ul
+#define ANNOUNCEMENT_PERIOD 10000000ul
 
 namespace mysook {
 
@@ -23,6 +24,9 @@ protected:
 	WiFiAP *current = 0;
 
     unsigned long timeout = 0;
+    unsigned long last_announcement = 0;
+
+    bool scanning = false;
 
     WiFiEventId_t listener_id = 0;
 
@@ -66,7 +70,34 @@ protected:
         }
 
         // Scan the networks to find the best available
-        byte n = WiFi.scanNetworks();
+        byte n;
+        if (scanning) {
+            n = WiFi.scanComplete();
+            scanning = false;
+        }
+        else {
+            n = WiFi.scanNetworks(true);
+            scanning = true;
+        }
+
+        if (n == WIFI_SCAN_RUNNING) {
+            return;
+        }
+
+        else if (n == WIFI_SCAN_FAILED) {
+            logger.logf_ln("W [network] WiFi scan for networks failed");
+            return;
+        }
+
+        else if (n < 0) {
+            logger.logf_ln("E [network] Unknown error scanning for networks (%d)", n);
+            return;
+        }
+        
+        else if (n == 0) {
+            logger.logf_ln("I [network] No WiFi networks detected");
+            return;
+        }
 
         WiFiAP *best_conn = 0;
         long best_signal = -1000;
@@ -82,7 +113,11 @@ protected:
 
         // No configured network was found
         if (best_conn == 0) {
-            logger.logf_ln("W [network] No allowed SSIDs visible");
+            if (last_announcement + ANNOUNCEMENT_PERIOD < micros()) {
+                logger.logf_ln("W [network] No known SSIDs visible");
+                last_announcement = micros();
+            }
+
             current = &memory[0];
         }
 
