@@ -2,3 +2,4 @@
 .piolibdeps
 
 src/secrets.h
+*.o

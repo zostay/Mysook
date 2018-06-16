@@ -64,9 +64,9 @@ class NameTag::Frame {
 }
 
 class NameTag::FrameStack {
-    has Frame @.frames = Frame.new;
+    has NameTag::Frame @.frames = NameTag::Frame.new;
 
-    method push() { @!frames.push: Frame.new; return; }
+    method push() { @!frames.push: NameTag::Frame.new; return; }
     method pop() { @!frames.pop; return; }
 
     method push-arg() { @!frames[*-1].push-arg() }
@@ -81,9 +81,9 @@ class NameTag::ProgramBuilder {
     has @!program;
     has $!start = 1;
 
-    has Codex $.codex .= new;
-    has Heap $.heap .= new;
-    has FrameStack $.frame .= new;
+    has NameTag::Codex $.codex .= new;
+    has NameTag::Heap $.heap .= new;
+    has NameTag::FrameStack $.frame .= new;
 
     method ops(*@ops) { $!frame.end-decls; @!program.append: @ops; }
     method decls(*@ops) { @!program.append: @ops; }
@@ -102,11 +102,11 @@ class NameTag::ProgramBuilder {
         self.ops: OP_RETURN;
     }
 
-    method arg(Expression $) { }
+    method arg(NameTag::Expression $) { }
 
     method call(Str $name, *@args) {
         for @args {
-            when Expression { }
+            when NameTag::Expression { }
             default { self.ops: OP_PUSH, $_; }
         }
         self.ops: OP_PUSH, $!codex.lookup($name), OP_GOSUB;
@@ -132,7 +132,7 @@ class NameTag::ProgramBuilder {
         self.decls: OP_PUSH, $value, OP_PUSH, $size, OP_ALLOC;
     }
 
-    multi method local-array(Str $name, Expression $size, Expression $value) {
+    multi method local-array(Str $name, NameTag::Expression $size, NameTag::Expression $value) {
         $!frame.allocate($name);
         self.decls: OP_SWAP, OP_ALLOC;
     }
@@ -158,12 +158,12 @@ class NameTag::ProgramBuilder {
         self.ops: OP_PUSH, $value, OP_PUSH, $base + $index, $write;
     }
 
-    multi method set(Str $name, Expression $) {
+    multi method set(Str $name, NameTag::Expression $) {
         my ($base, $, $write) = self!lookup($name);
         self.ops: OP_PUSH, $base, $write;
     }
 
-    multi method set(Str $name, Expression $, Expression $) {
+    multi method set(Str $name, NameTag::Expression $, NameTag::Expression $) {
         my ($base, $, $write) = self!lookup($name);
         self.ops: OP_SWAP, OP_PUSH, $base, OP_ADD, $write;
     }
@@ -171,29 +171,29 @@ class NameTag::ProgramBuilder {
     multi method get(Str $name, Int $index = 0) {
         my ($base, $read, $) = self!lookup($name);
         self.decls: OP_PUSH, $base + $index, $read;
-        Expression;
+        NameTag::Expression;
     }
 
-    multi method get(Str $name, Expression $) {
+    multi method get(Str $name, NameTag::Expression $) {
         my ($base, $read, $) = self!lookup($name);
         self.ops: OP_PUSH, $base, OP_ADD, $read;
-        Expression;
+        NameTag::Expression;
     }
 
     multi method get(VMRegister $reg) {
         self.ops: OP_PUSH, $reg, OP_GET;
-        Expression;
+        NameTag::Expression;
     }
 
     method read-arg(Int $num where $num < 0) {
         self.ops: OP_PUSH, -$num, OP_READARG;
-        Expression;
+        NameTag::Expression;
     }
 
-    method rand() { self.decls: OP_RAND; Expression }
-    method width() { self.decls: OP_WIDTH; Expression }
-    method height() { self.decls: OP_HEIGHT; Expression }
-    method num(Int $value) { self.decls: OP_PUSH, $value; Expression }
+    method rand() { self.decls: OP_RAND; NameTag::Expression }
+    method width() { self.decls: OP_WIDTH; NameTag::Expression }
+    method height() { self.decls: OP_HEIGHT; NameTag::Expression }
+    method num(Int $value) { self.decls: OP_PUSH, $value; NameTag::Expression }
 
     method set-urgency(Int $value) {
         self.ops: OP_PUSH, $value, OP_URGENCY;
@@ -203,7 +203,7 @@ class NameTag::ProgramBuilder {
         self.ops: OP_PUSH, $value, OP_BRIGHTNESS;
     }
 
-    multi method if(Expression $, &block) {
+    multi method if(NameTag::Expression $, &block) {
         my $end-if = $!codex.jump-point;
 
         self.ops: OP_NOT, OP_PUSH, $end-if, OP_CMP;
@@ -221,7 +221,7 @@ class NameTag::ProgramBuilder {
         self.ops: OP_SUB, $end-loop;
     }
 
-    multi method for(Expression $, Expression $, Str $counter, &block) {
+    multi method for(NameTag::Expression $, NameTag::Expression $, Str $counter, &block) {
         my ($index, $read-op, $write-op) = self!lookup($counter);
 
         my $begin-loop = $!codex.jump-point;
@@ -260,7 +260,7 @@ class NameTag::ProgramBuilder {
         self.ops: OP_PUSH, $color, OP_FOREGROUND;
     }
 
-    multi method set-foreground(Expression $) {
+    multi method set-foreground(NameTag::Expression $) {
         self.ops: OP_FOREGROUND;
     }
 
@@ -272,7 +272,7 @@ class NameTag::ProgramBuilder {
         self.ops: OP_PUSH, $mask, OP_FILL_COLUMNS;
     }
 
-    multi method fill-columns(Expression $) {
+    multi method fill-columns(NameTag::Expression $) {
         self.ops: OP_FILL_COLUMNS;
     }
 
@@ -280,7 +280,7 @@ class NameTag::ProgramBuilder {
         self.ops: OP_PUSH, $mask, OP_FILL_ROWS;
     }
 
-    multi method fill-rows(Expression $) {
+    multi method fill-rows(NameTag::Expression $) {
         self.ops: OP_FILL_ROWS;
     }
 
@@ -288,7 +288,7 @@ class NameTag::ProgramBuilder {
         self.ops: OP_PUSH, $mask, OP_MASK_COLUMNS;
     }
 
-    multi method mask-columns(Expression $) {
+    multi method mask-columns(NameTag::Expression $) {
         self.ops: OP_MASK_COLUMNS;
     }
 
@@ -296,7 +296,7 @@ class NameTag::ProgramBuilder {
         self.ops: OP_PUSH, $mask, OP_MASK_ROWS;
     }
 
-    multi method mask-rows(Expression $) {
+    multi method mask-rows(NameTag::Expression $) {
         self.ops: OP_MASK_ROWS;
     }
 
@@ -304,7 +304,7 @@ class NameTag::ProgramBuilder {
         self.ops: OP_PUSH, $x, OP_PUSH, $y, OP_PIXEL;
     }
 
-    multi method pixel(Expression $, Expression $) {
+    multi method pixel(NameTag::Expression $, NameTag::Expression $) {
         self.ops: OP_PIXEL;
     }
 
@@ -312,7 +312,7 @@ class NameTag::ProgramBuilder {
         self.ops: OP_PUSH, $x, OP_PUSH, $y, OP_SET_CURSOR;
     }
 
-    multi method set-cursor(Expression $, Expression $) {
+    multi method set-cursor(NameTag::Expression $, NameTag::Expression $) {
         self.ops: OP_SET_CURSOR;
     }
 
@@ -387,23 +387,23 @@ sub program(&block) is export {
     $builder;
 }
 
-multi infix:<*> (Expression $a, Expression $b) is export { $*ntpb.decls: OP_MUL; Expression }
-multi infix:<+> (Expression $a, Expression $b) is export { $*ntpb.decls: OP_ADD; Expression }
-multi infix:<-> (Expression $a, Expression $b) is export { $*ntpb.decls: OP_MIN; Expression }
-multi infix:</> (Expression $a, Expression $b) is export { $*ntpb.decls: OP_DIV; Expression }
-multi infix:<%> (Expression $a, Expression $b) is export { $*ntpb.decls: OP_MOD; Expression }
+multi infix:<*> (NameTag::Expression $a, NameTag::Expression $b) is export { $*ntpb.decls: OP_MUL; NameTag::Expression }
+multi infix:<+> (NameTag::Expression $a, NameTag::Expression $b) is export { $*ntpb.decls: OP_ADD; NameTag::Expression }
+multi infix:<-> (NameTag::Expression $a, NameTag::Expression $b) is export { $*ntpb.decls: OP_MIN; NameTag::Expression }
+multi infix:</> (NameTag::Expression $a, NameTag::Expression $b) is export { $*ntpb.decls: OP_DIV; NameTag::Expression }
+multi infix:<%> (NameTag::Expression $a, NameTag::Expression $b) is export { $*ntpb.decls: OP_MOD; NameTag::Expression }
 
-multi infix:<==> (Expression $a, Expression $b) is export { $*ntpb.decls: OP_EQ; Expression }
-multi infix:<!=> (Expression $a, Expression $b) is export { $*ntpb.decls: OP_NE; Expression }
-multi infix:«<» (Expression $a, Expression $b)  is export { $*ntpb.decls: OP_LT; Expression }
-multi infix:«<=» (Expression $a, Expression $b) is export { $*ntpb.decls: OP_LE; Expression }
-multi infix:«>» (Expression $a, Expression $b) is export { $*ntpb.decls: OP_GT; Expression }
-multi infix:«>=» (Expression $a, Expression $b) is export { $*ntpb.decls: OP_GE; Expression }
+multi infix:<==> (NameTag::Expression $a, NameTag::Expression $b) is export { $*ntpb.decls: OP_EQ; NameTag::Expression }
+multi infix:<!=> (NameTag::Expression $a, NameTag::Expression $b) is export { $*ntpb.decls: OP_NE; NameTag::Expression }
+multi infix:«<» (NameTag::Expression $a, NameTag::Expression $b)  is export { $*ntpb.decls: OP_LT; NameTag::Expression }
+multi infix:«<=» (NameTag::Expression $a, NameTag::Expression $b) is export { $*ntpb.decls: OP_LE; NameTag::Expression }
+multi infix:«>» (NameTag::Expression $a, NameTag::Expression $b) is export { $*ntpb.decls: OP_GT; NameTag::Expression }
+multi infix:«>=» (NameTag::Expression $a, NameTag::Expression $b) is export { $*ntpb.decls: OP_GE; NameTag::Expression }
 
-multi infix:<+&> (Expression $a, Expression $b) is export { $*ntpb.decls: OP_AND; Expression }
-multi infix:<+|> (Expression $a, Expression $b) is export { $*ntpb.decls: OP_OR; Expression }
-multi infix:<+^> (Expression $a, Expression $b) is export { $*ntpb.decls: OP_XOR; Expression }
-multi prefix:<!> (Expression $a) is export { $*ntpb.decls: OP_NOT; Expression }
-multi infix:«+<» (Expression $a, Expression $b) is export { $*ntpb.decls: OP_BSL; Expression }
-multi infix:«+>» (Expression $a, Expression $b) is export { $*ntpb.decls: OP_BSR; Expression }
-multi prefix:<+^> (Expression $a) is export { $*ntpb.decls: OP_COMP; Expression }
+multi infix:<+&> (NameTag::Expression $a, NameTag::Expression $b) is export { $*ntpb.decls: OP_AND; NameTag::Expression }
+multi infix:<+|> (NameTag::Expression $a, NameTag::Expression $b) is export { $*ntpb.decls: OP_OR; NameTag::Expression }
+multi infix:<+^> (NameTag::Expression $a, NameTag::Expression $b) is export { $*ntpb.decls: OP_XOR; NameTag::Expression }
+multi prefix:<!> (NameTag::Expression $a) is export { $*ntpb.decls: OP_NOT; NameTag::Expression }
+multi infix:«+<» (NameTag::Expression $a, NameTag::Expression $b) is export { $*ntpb.decls: OP_BSL; NameTag::Expression }
+multi infix:«+>» (NameTag::Expression $a, NameTag::Expression $b) is export { $*ntpb.decls: OP_BSR; NameTag::Expression }
+multi prefix:<+^> (NameTag::Expression $a) is export { $*ntpb.decls: OP_COMP; NameTag::Expression }

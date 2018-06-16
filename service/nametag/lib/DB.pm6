@@ -45,6 +45,8 @@ method txn(&code) {
 }
 
 method create-schema() {
+    try { $!dbh.ping } or self.connect();
+
     $!dbh.do(qq[
         CREATE TABLE IF NOT EXISTS program_v1(
             id NOT NULL AUTO_INCREMENT,

@@ -8,24 +8,25 @@ use Crypt::RSA;
 use DB;
 use NameTag::ProgramValidator;
 
-BEGIN {
-    die "missing DEVICE_KEY" if %*ENV<DEVICE_KEY> :!exists;
-    die "device key must be formatted as EXPONENT:MODULUS"
-        unless %*ENV<DEVICE_KEY>.Str ~~ /^\d+ ':' \d+$/;
-}
-
-constant $public-key = Crypt::RSA::Key.new(
-    exponent => %*ENV<DEVICE_KEY>.Str.split(":", 2)[0].Int,
-    modulus  => %*ENV<DEVICE_KEY>.Str.split(":", 2)[1].Int,
-);
-
-my $db = DB.new;
-my $rsa = Crypt::RSA.new(:$public-key);
-
 class NameTagID does Cro::HTTP::Auth { }
 
 class NameTagAuth does Cro::HTTP::Middleware::Request {
+    has $.db;
+    has $.rsa;
     has $.credentials;
+
+    submethod TWEAK {
+        die "missing DEVICE_KEY" without %*ENV<DEVICE_KEY>;
+        die "device key must be formatted as EXPONENT:MODULUS"
+            unless %*ENV<DEVICE_KEY>.Str ~~ /^\d+ ':' \d+$/;
+
+        my $public-key = Crypt::RSA::Key.new(
+            exponent => %*ENV<DEVICE_KEY>.Str.split(":", 2)[0].Int,
+            modulus  => %*ENV<DEVICE_KEY>.Str.split(":", 2)[1].Int,
+        );
+
+        $!rsa = Crypt::RSA.new(:$public-key);
+    }
 
     method process(Supply $requests --> Supply) {
         supply whenever $requests -> $req {
@@ -35,9 +36,9 @@ class NameTagAuth does Cro::HTTP::Middleware::Request {
 
                 if ($type.lc eq 'signature') {
                     my ($message, $signature) = $credentials.split(':', 2);
-                    my ($plain) = $rsa.encrypt($signature);
+                    my ($plain) = $!rsa.encrypt($signature);
                     my ($nonce, $sig-message) = split(':', 2);
-                    if $db.check-nonce && $message eq $sig-message {
+                    if $!db.check-nonce && $message eq $sig-message {
                         $auth = NameTagID.new;
                     }
                 }
@@ -50,9 +51,11 @@ class NameTagAuth does Cro::HTTP::Middleware::Request {
 }
 
 class RateLimiter does Cro::HTTP::Middleware::Request {
+    has $.db;
+
     method process(Supply $requests --> Supply) {
         supply whenever $requests -> $req {
-            my $length = $db.queue-length;
+            my $length = $!db.queue-length;
 
             # The longer the queue, the longer the wait time, up to 60 seconds
             my $wait-time = 60 min e ** $length / 7;
@@ -70,8 +73,11 @@ class X::ValidationFail is Exception {
 }
 
 sub routes() is export {
+    my $db = DB.new;
+    $db.create-schema;
+
     my $rate-limited-routes = route {
-        before RateLimiter;
+        before RateLimiter.new(:$db);
 
         # Upload a program
         post -> 'program' {
@@ -158,7 +164,7 @@ sub routes() is export {
 
 
     my $nametag-routes = route {
-        before NameTagAuth;
+        before NameTagAuth.new(:$db);
 
         # Dequeue a program
         post -> NameTagID $tag, 'next-program' {
