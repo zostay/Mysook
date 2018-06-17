@@ -47,7 +47,11 @@
 */
 
 #include <inttypes.h>
+#ifdef ARDUINO
 #include <Adafruit_GFX.h>
+#else
+#include <Sim_Adafruit_GFX.h>
+#endif
 
 #include "TomThumb.h"
 

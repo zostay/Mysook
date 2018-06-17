@@ -38,12 +38,16 @@ void SimPanel<W,H>::draw() {
 
     float brightness_coeff = log(this->brightness) / log255;
 
+    uint32_t *buffer = this->grid.getBuffer();
     for (int cy = 0; cy < H; ++cy) {
         for (int cx = 0; cx < W; ++cx) {
+            int xy = cy * W + cx;
+
+            uint32_t &bc = buffer[xy];
             uint8_t r, g, b;
-            r = this->grid[cx][cy].r * brightness_coeff;
-            g = this->grid[cx][cy].g * brightness_coeff;
-            b = this->grid[cx][cy].b * brightness_coeff;
+            r = (bc >> 0x10) * brightness_coeff;
+            g = (bc >> 0x08) * brightness_coeff;
+            b = (bc        ) * brightness_coeff;
 
             ALLEGRO_COLOR c = al_map_rgb(r, g, b);
             al_draw_filled_circle(cx*160.0f + 80.0f, cy*160.0f + 80.0f, 40.0f, c);

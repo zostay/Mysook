@@ -9,14 +9,18 @@
 #include <MC_Network.h>
 
 #include "secrets.h"
+#else
+#include <SimLogger.h>
+#include <SimPanel.h>
+#include <Network.h>
 #endif//ARDUINO
 
 #include "nametag.h"
 
+#ifdef ARDUINO
 #define DATAPIN  27
 #define CLOCKPIN 13
 
-#ifdef ARDUINO
 Adafruit_DotStarMatrix matrix = Adafruit_DotStarMatrix(
         12, 6, DATAPIN, CLOCKPIN,
         DS_MATRIX_BOTTOM     + DS_MATRIX_LEFT +
@@ -26,6 +30,10 @@ Adafruit_DotStarMatrix matrix = Adafruit_DotStarMatrix(
 mysook::MC_Logger<Print> logger(&micros, Serial);
 mysook::MC_RGBPanel<12,6,Adafruit_DotStarMatrix> display(matrix);
 mysook::MC_Network network(logger);
+#else
+mysook::SimLogger logger;
+mysook::SimPanel<12,6> display;
+mysook::Network network;
 #endif//ARDUINO
 
 NameTag nametag(logger, display, network);
@@ -54,3 +62,10 @@ void setup() {
 void loop() {
     nametag.loop();
 }
+
+#ifndef ARDUINO
+int main(int argc, char **argv) {
+    setup();
+    while (true) loop();
+}
+#endif//ARDUINO

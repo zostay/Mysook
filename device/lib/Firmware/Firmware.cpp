@@ -21,7 +21,7 @@ unsigned long mysook::get_micros() {
     }
 
     else {
-        logf_ln("Failed making micros from gettimeofday(): %s", strerror(errno));
+        //logf_ln("Failed making micros from gettimeofday(): %s", strerror(errno));
 
         // Bad Stuff
         return 0ul;

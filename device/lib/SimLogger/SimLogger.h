@@ -3,6 +3,8 @@
 
 #include <iostream>
 
+#include <Logger.h>
+
 namespace mysook {
 
 class SimLogger : public Logger {

@@ -6,6 +6,7 @@ use HTTP::Request::Common;
 
 sub get-program($program) {
     use NameTag;
+    use NameTag::ProgramBuilder;
     EVALFILE $program;
 }
 

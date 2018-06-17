@@ -12,6 +12,10 @@
 #include "ops.h"
 #include "TomThumb.h"
 
+#ifndef ARDUINO
+#include <stdlib.h>
+#endif//ARDUINO
+
 #define STACK_SIZE 4096
 #define HEAP_SIZE  256
 

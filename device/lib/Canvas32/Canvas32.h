@@ -1,7 +1,11 @@
 #ifndef __CANVAS32_H
 #define __CANVAS32_H
 
+#ifdef ARDUINO
 #include <Adafruit_GFX.h>
+#else
+#include <Sim_Adafruit_GFX.h>
+#endif
 
 class Canvas32 : public Adafruit_GFX {
 public:
