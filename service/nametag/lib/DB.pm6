@@ -49,7 +49,7 @@ method create-schema() {
 
     $!dbh.do(qq[
         CREATE TABLE IF NOT EXISTS program_v1(
-            id NOT NULL AUTO_INCREMENT,
+            id INT NOT NULL AUTO_INCREMENT,
             name VARCHAR(100) NOT NULL,
             author VARCHAR(100) NOT NULL,
             descriptor BLOB,
@@ -59,7 +59,7 @@ method create-schema() {
 
     $!dbh.do(qq[
         CREATE TABLE IF NOT EXISTS queue_v1(
-            id NOT NULL AUTO_INCREMENT,
+            id INT NOT NULL AUTO_INCREMENT,
             program_id INT NOT NULL,
             dequeued INT(1) NOT NULL DEFAULT 0,
             PRIMARY KEY (id)
