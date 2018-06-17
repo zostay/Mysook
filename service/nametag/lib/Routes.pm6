@@ -18,7 +18,7 @@ class NameTagAuth does Cro::HTTP::Middleware::Request {
     submethod TWEAK {
         die "missing DEVICE_KEY" without %*ENV<DEVICE_KEY>;
         die "device key must be formatted as EXPONENT:MODULUS"
-            unless %*ENV<DEVICE_KEY>.Str ~~ /^\d+ ':' \d+$/;
+            unless %*ENV<DEVICE_KEY>.Str ~~ /^\d+ ':' \d+/;
 
         my $public-key = Crypt::RSA::Key.new(
             exponent => %*ENV<DEVICE_KEY>.Str.split(":", 2)[0].Int,
