@@ -1,7 +1,9 @@
 FROM croservices/cro-http:0.7.5
 
 RUN apt-get update \
-    && apt-get install -y libmariadbclient-dev-compat
+    && apt-get install -y mysql-client default-libmysqlclient-dev
+
+RUN ln -s /usr/lib/x86_64-linux-gnu/libmariadbclient.so.18 /usr/lib/x86_64-linux-gnu/libmysqlclient.so.18
 
 RUN mkdir /app
 COPY . /app
