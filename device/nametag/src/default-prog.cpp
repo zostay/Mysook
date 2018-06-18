@@ -1,9 +1,7 @@
 #include <inttypes.h>
 #include "ops.h"
 
-#define NAMETAG 1
-
-uint32_t program[] = {
+uint32_t default_program[] = {
     OP_SUB, 1, OP_PUSH, 16777215, OP_PUSH, 0, OP_PUSH, 0, OP_PUSH, 2, OP_URGENCY,
     OP_PUSH, 75, OP_BRIGHTNESS, OP_SUB, 2, OP_RAND, OP_PUSH, 12632256, OP_OR,
     OP_PUSH, 0, OP_WRITE, OP_WIDTH, OP_PUSH, 2, OP_WRITE, OP_SUB, 4, OP_PUSH, 0,

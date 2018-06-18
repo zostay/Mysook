@@ -14,8 +14,7 @@
 using std::placeholders::_1;
 using std::placeholders::_2;
 
-#define UPDATE_PIXEL 1
-#define PROGRAM_MAIN 6
+#define PROGRAM_MAIN 1
 
 extern uint32_t default_program[];
 
