@@ -50,7 +50,11 @@ sub dump-cpp($program) {
     say '};';
 }
 
-sub MAIN(Str :program($program-file)!, Str :host($nametag), Bool :$cpp) {
+sub dump-bin($program) {
+    for @($program.bytes) { .chr.print }
+}
+
+sub MAIN(Str :program($program-file)!, Str :host($nametag), Bool :$cpp, Bool :$bin) {
     my $program = get-program($program-file);
 
     if ($nametag) {
@@ -58,6 +62,9 @@ sub MAIN(Str :program($program-file)!, Str :host($nametag), Bool :$cpp) {
     }
     elsif ($cpp) {
         dump-cpp($program);
+    }
+    elsif ($bin) {
+        dump-bin($program);
     }
     else {
         USAGE();
