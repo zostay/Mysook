@@ -24,7 +24,7 @@
   ],
   "provides": {
       "NameTag": "lib/NameTag.pm6",
-      "NameTag::ProgramBuilder": "lib/NameTag/ProgramBuilder.p6m"
+      "NameTag::ProgramBuilder": "lib/NameTag/ProgramBuilder.pm6"
   },
   "version": "0.0.1",
   "meta-version": "0",
