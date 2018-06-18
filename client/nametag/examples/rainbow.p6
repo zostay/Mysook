@@ -1,10 +1,8 @@
 use v6;
 
 program {
-    .fun: "setup", {
-        .global: "rgb";
-        .global: "tick", 0;
-    }
+    .global: "rgb";
+    .global: "tick", 0;
 
     .fun: "hsv2rgb", {
         .local: "hsv";

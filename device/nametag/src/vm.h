@@ -16,6 +16,8 @@
 #include <stdlib.h>
 #endif//ARDUINO
 
+#define MAX_TIME_SLICE 25000ul
+
 #define STACK_SIZE 4096
 #define HEAP_SIZE  256
 
@@ -430,7 +432,16 @@ void VM<W,H>::tick_exec() {
     if (halted) return;
 
     reset_tick();
-    while (!has_ticked() && !has_halted()) step_exec();
+    unsigned long tick_start = mysook::get_micros();
+    while (!has_ticked() && !has_halted()) {
+        step_exec();
+
+        // a tick is only permitted to be MAX_TIME_SLICE long
+        if (tick_start + MAX_TIME_SLICE < mysook::get_micros()) {
+            log.logf_ln("W [vm] <PP:%08X> Skipping tick: the program took too long.");
+            break;
+        }
+    }
 
     //log.logf_ln("I [vm] Tick!");
 }
