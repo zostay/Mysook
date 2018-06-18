@@ -54,7 +54,7 @@ sub dump-bin($program) {
     for @($program.bytes) { .chr.print }
 }
 
-sub MAIN(Str :program($program-file)!, Str :host($nametag), Bool :$cpp, Bool :$bin) {
+sub MAIN(Str :program($program-file)!, Str :host($nametag) = 'nametag-zostay.local', Bool :$cpp, Bool :$bin) {
     my $program = get-program($program-file);
 
     if ($nametag) {
