@@ -226,7 +226,7 @@ public:
     uint32_t read_stack(int stack_ptr) {
         if (stack_ptr < 0 || stack_ptr >= STACK_SIZE) {
             // PANIC!
-            log.logf_ln("E [vm] segmentation fault reading %d", stack_ptr);
+            log.logf_ln("E [vm] <PP:%08X> segmentation fault reading %d", program_ptr, stack_ptr);
             halt();
             return 0;
         }
@@ -238,7 +238,7 @@ public:
     void write_stack(int stack_ptr, uint32_t val) {
         if (stack_ptr < 0 || stack_ptr >= STACK_SIZE) {
             // PANIC!
-            log.logf_ln("E [vm] segmentation fault writing %d", stack_ptr);
+            log.logf_ln("E [vm] <PP:%08X> segmentation fault writing %d", program_ptr, stack_ptr);
             halt();
             return;
         }
