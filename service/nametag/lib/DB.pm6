@@ -23,9 +23,9 @@ method txn(&code) {
     my $result;
     my $retried = False;
     repeat {
-        ENTER { $!dbh.do(q[START TRANSACTION]); }
-        KEEP { $!dbh.do(q[COMMIT TRANSACTION]); }
-        UNDO { $!dbh.do(q[ROLLBACK TRANSACTION]); }
+        ENTER { $!dbh.do(q[BEGIN WORK]); }
+        KEEP { $!dbh.do(q[COMMIT WORK]); }
+        UNDO { $!dbh.do(q[ROLLBACK WORK]); }
 
         my $*TXN = True;
 

@@ -10,7 +10,7 @@ my Cro::Service $http = Cro::HTTP::Server.new(
         die("Missing NAMETAG_PORT in environment"),
     application => routes(),
     after => [
-        Cro::HTTP::Log::File.new(logs => $*OUT, errors => $*ERR)
+        Cro::HTTP::Log::File.new(logs => $*OUT, errors => $*ERR),
     ]
 );
 $http.start;

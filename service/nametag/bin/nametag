@@ -2,42 +2,70 @@
 use v6;
 
 use Base64;
-use JSON::Tiny;
-use HTTP::UserAgent;
+use Cro::HTTP::Client;
+use Cro::Uri;
 
-my $ua = HTTP::UserAgent.new;
-my $BASE-URL = 'https://nametag.zostay.com';
+my %*SUB-MAIN-OPTS = :named-anywhere;
+my $base-uri-str = %*ENV<NAMETAG_URI> // 'https://nametag.zostay.com';
 
-multi MAIl('program', :$name!, :$author!, :$base-url = $BASE-URL) {
-    my $p6-program = $*ARGFILES.slurp;
+my $base-uri = Cro::Uri.parse($base-uri-str);
+my $ua       = Cro::HTTP::Client.new(:$base-uri);
+
+multi MAIN('program', 'list') {
+    my $res = await $ua.get("program");
+
+    my %length;
+    if $res.status == 200 {
+        my $info     = await $res.body;
+        my @programs = @($info<programs>);
+
+        %length<name>   = [max] 1, |@programs.map(*.<name>);
+        %length<author> = [max] 1, |@programs.map(*.<author>);
+
+        printf "%-%length<name>s %-%length<author>s\n", .<name>, .<author>
+            for %(name=>'Name',author=>'Author'), |@programs;
+    }
+    else {
+        note "UNKNOWN ERROR: {await $res.body()}";
+    }
+}
+
+multi MAIN('program', 'add', :$name!, :$author!, :$program!) {
+    my $p6-program = do given $program {
+        when '-' { $*IN.slurp }
+        default  { .IO.slurp }
+    }
 
     my $blob-program = do {
         use MONKEY-SEE-NO-EVAL;
         use NameTag;
-        $pt-program.EVAL;
+        use NameTag::ProgramBuilder;
+        $p6-program.EVAL;
     }
 
-    my $res = $ua.post("$BASE-URL/program",
-        Content-Type => 'application/json',
-        Content => to-json(%(
-            name => $name,
-            author => $author,
-            program => encode-base64($blob-program, :str),
-        )),
+    my $res = await $ua.post("program",
+        content-type => 'application/json',
     );
+    #     body => %(
+    #         name => $name,
+    #         author => $author,
+    #         program => $blob-program.bytes,
+    #     ),
+    # );
 
-    if $req.is-success {
-        my $created = from-json($req.body);
+    CATCH {
+        when X::Cro::HTTP::Error {
+            note .response.Str;
+        }
+    }
+
+    if $res.status == 200 {
+        my $created = await $res.body;
         say "Program $created<id>";
     }
     else {
-        if $req.header('Content-Type') eq 'application/json' {
-            my $error = from-json($req.body);
-            note "$error<field>: $error<message>"
-                if $error ~~ Hash && ($error<field> && $error<message>));
-        }
-        else {
-            note "UNKNOWN ERROR: $req.body()";
-        }
+        my $error = await $res.body;
+        note "$error<field>: $error<message>"
+            if $error ~~ Hash && ($error<field> && $error<message>);
     }
 }

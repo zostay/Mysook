@@ -15,7 +15,8 @@
   "depends": [
     "Base64",
     "Cro::HTTP",
-    "Crypt::RSA"
+    "Crypt::RSA",
+    "IO::Socket::SSL"
   ],
   "tags": [
     ""
