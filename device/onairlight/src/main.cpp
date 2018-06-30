@@ -43,9 +43,10 @@ void setup() {
 }
 
 void loop() {
+    char buf[32];
     if (Wire.available()) {
         size_t s = Wire.readBytes(buf, 32);
-        sign.writeBytes(buf, s);
+        sign.write_bytes(buf, s);
     }
     
     sign.loop();
