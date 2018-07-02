@@ -76,7 +76,7 @@ struct GridMessage {
     }
 };
 
-struct BrightnessMessage  {
+struct BrightnessMessage {
     uint8_t brightness;
 };
 
@@ -124,21 +124,35 @@ class OnAirSwitch : public mysook::Firmware {
         status_light.off();
     }
 
+    void emit(BrightnessMessage &b) {
+        Wire.beginTransmission(GRID_ADDRESS);
+        Wire.write(BRIGHTNESS);
+        Wire.write((char *) &b, sizeof(BrightnessMessage));
+        Wire.endTransmission();
+
+    }
+
+    void emit(PixelMessage &p) {
+        Wire.beginTransmission(GRID_ADDRESS);
+        Wire.write(PIXEL);
+        Wire.write((char *) &p, sizeof(PixelMessage));
+        Wire.endTransmission();
+    }
+
 public:
 
     using mysook::Firmware;
 
     OnAirSwitch(mysook::Logger &logger, mysook::Network &network, mysook::LED &status_light, mysook::MessageBus &bus) 
     : Firmware(logger), network(network), status_light(status_light),
-    bus(bus), udp_server(network, UDP_PORT, dispatcher, logger) {
+    udp_server(network, UDP_PORT, dispatcher, logger) {
         this->add_pre_ticker(&network);
-        this->add_pre_ticker(&bus);
         this->add_pre_ticker(&udp_server);
     }
 
     void transmit_message(GridMessage &grid) {
         BrightnessMessage b = { .brightness=grid.brightness };
-        bus.emit(GRID_ADDRESS, BRIGHTNESS, &b, sizeof(b));
+        emit(b);
 
         PixelMessage p;
         for (uint8_t y = 0; y < 8; ++y) {
@@ -148,7 +162,7 @@ public:
                 p.r = grid.grid[x][y].r;
                 p.g = grid.grid[x][y].g;
                 p.b = grid.grid[x][y].b;
-                bus.emit(GRID_ADDRESS, PIXEL, &p, sizeof(p));
+                emit(p);
             }
         }
 
@@ -176,7 +190,6 @@ private:
     std::queue<GridMessage> mq;
 
     mysook::Network &network;
-    mysook::MessageBus &bus;
     mysook::LED &status_light;
 
     mysook::UdpDispatcher dispatcher = std::bind(&OnAirSwitch::handle_udp_packet, this, _1, _2, _3, _4);

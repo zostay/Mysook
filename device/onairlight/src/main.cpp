@@ -13,6 +13,8 @@
 #ifdef ARDUINO
 #define PIN_GRID  2
 
+#define GRID_ADDRESS 42
+
 Adafruit_NeoMatrix matrix(8, 8, 2,
     NEO_MATRIX_TOP + NEO_MATRIX_LEFT +
     NEO_MATRIX_ROWS + NEO_MATRIX_PROGRESSIVE,
@@ -36,7 +38,7 @@ void setup() {
 
     matrix.begin();
 
-    Wire.begin();
+    Wire.begin(GRID_ADDRESS);
 #endif//ARDUINO
 
     sign.setup();
@@ -45,8 +47,8 @@ void setup() {
 void loop() {
     char buf[32];
     if (Wire.available()) {
-        size_t s = Wire.readBytes(buf, 32);
-        sign.write_bytes(buf, s);
+        size_t s = Wire.read(buf, 32);
+        sign.send(buf[0], buf+1, s - 1);
     }
     
     sign.loop();
