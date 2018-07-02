@@ -10,6 +10,7 @@ public:
 	virtual ~Network() { }
 
     virtual uint8_t signal_strength() { return 127; }
+    virtual bool connecting() { return false; }
     virtual bool connected() { return true; }
 
     virtual bool ready_for_tick(unsigned long now) { return false; }

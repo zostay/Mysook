@@ -30,6 +30,7 @@ protected:
 
     WiFiEventId_t listener_id = 0;
 
+    bool should_connect = false;
     bool connect_status = false;
 
     Logger &logger;
@@ -148,7 +149,9 @@ protected:
 public:
     MC_Network(Logger &logger) : logger(logger) { }
 
+    virtual bool connecting() { return should_connect && !connect_status; }
     virtual bool connected() { return connect_status; }
+
     virtual uint8_t signal_strength() {
         long base_value = WiFi.RSSI();
         if (base_value < -100) {
@@ -174,11 +177,15 @@ public:
         return now >= timeout;
     }
 
-    virtual void tick() { connect(); }
+    virtual void tick() { if (should_connect) find_connection(); }
         
-    void connect() { find_connection(); }
+    void connect() { 
+        should_connect = true;
+        find_connection(); 
+    }
 
     void disconnect() {
+        should_connect = false;
         connect_status = false;
         current = 0;
 
