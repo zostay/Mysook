@@ -2,7 +2,7 @@
 #include <cstdarg>
 #include <cstdio>
 
-// Some sinister dark magic here...
+// Some sinister dark magic is going on here...
 #undef logf
 
 using namespace mysook;
