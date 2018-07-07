@@ -1,12 +1,21 @@
 #ifndef __LOGGER_H
 #define __LOGGER_H
 
+#ifndef NOT_FUNCTIONAL
 #include <functional>
+#endif//NOT_FUNCTIONAL
 #include <cstdarg>
 
 namespace mysook {
 
+#ifdef NOT_FUNCTIONAL
+typedef unsigned long (*GetMicrosFunction)();
+#else//NOT_FUNCTIONAL
 typedef std::function<unsigned long()> GetMicrosFunction;
+#endif//NOT_FUNCTIONAL
+
+// Some sinister dark magic is going on here...
+#undef logf
 
 class Logger {
 public:

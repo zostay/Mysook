@@ -2,6 +2,9 @@
 #include <cstdarg>
 #include <cstdio>
 
+// Some sinister dark magic here...
+#undef logf
+
 using namespace mysook;
 
 #define PRINT_BUF   256

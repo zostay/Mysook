@@ -8,38 +8,43 @@
 #define BRIGHTNESS 0x01
 #define PIXEL      0x02
 
-#define BRIGHTNESS_SIZE 1
-#define PIXEL_SIZE      5
+#define BRIGHTNESS_SIZE 2
+#define PIXEL_SIZE      6
 
-class OnAirSign : public Firmware {
+class OnAirSign : public mysook::Firmware {
 public:
-    OnAirSign(mysook::Logger &logger, mysook::Panel &display) 
+    OnAirSign(mysook::Logger &logger, mysook::RGBPanel<8,8> &display) 
         : Firmware(logger), _display(display) {}
 
-    void send(uint8_t op, uint8_t *msg, size_t msg_size) {
+    void send(uint8_t op) {
         switch (op) {
         case BRIGHTNESS:
-            if (msg_size == BRIGHTNESS_SIZE) {
-                _display.set_brightness(msg[0]);
+            if (Wire.available() >= BRIGHTNESS_SIZE) {
+                Wire.read(); // consume the op byte
+                _display.set_brightness(Wire.read());
             }
             break;
 
         case PIXEL:
-            if (msg_size == PIXEL_SIZE) {
+            if (Wire.available() >= PIXEL_SIZE) {
+                Wire.read(); // consume the op byte
                 _display.put_pixel(
-                    msg[0],
-                    msg[1],
-                    msg[2],
-                    msg[3],
-                    msg[4],
+                    Wire.read(),
+                    Wire.read(),
+                    Wire.read(),
+                    Wire.read(),
+                    Wire.read()
                 );
             }
             break;
+        }
+
+        //default: SOMETHING VERY BAD IS GOING TO HAPPEN NOW
     }
 
     virtual void start() {
-        display.set_brightness(30);
-        display.fill(Color(0, 0, 0));
+        _display.set_brightness(30);
+        _display.fill_screen(0, 0, 0);
     }
 
     virtual void tick() {
@@ -55,7 +60,7 @@ private:
     bool messages_received = false;
 
     mysook::RGBPanel<8,8> &_display;
-}
+};
 
 #endif//__ON_AIR_SIGN_H
 

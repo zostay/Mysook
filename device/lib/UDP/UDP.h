@@ -1,25 +1,31 @@
 #ifndef __UDP_H
 #define __UDP_H
 
+#ifdef NOT_FUNCTIONAL
 #include <functional>
+#endif
 
 #include <Network.h>
 
-namespace mysook;
+namespace mysook {
 
+#ifdef NOT_FUNCTIONAL
+typedef void (*UdpDispatcher)(String&,int,char*,size_t);
+#else
 typedef std::function<void(String&,int,char*,size_t)> UdpDispatcher;
+#endif
 
 class UdpListener : public Ticking {
     void ensure_started() {
         if (!udp) {
             udp.begin(port);
-            log.logf_ln("I [udp] UDP server listening on port %d", port);
+            _log.logf_ln("I [udp] UDP server listening on port %d", port);
         }
     }
 
     void ensure_stopped() {
         if (udp) {
-            log.logf_ln("W [udp] UDP server on port %d stopping", port);
+            _log.logf_ln("W [udp] UDP server on port %d stopping", port);
             udp.stop();
         }
     }
@@ -28,14 +34,14 @@ class UdpListener : public Ticking {
         int packet_size = udp.parsePacket();
         if (packet_size) {
             if (packet_size > buffer_size) 
-                log.logf_ln("W [udp] Received packet of size %d from %s:%d, but buffer size is %d. Message truncated.", 
+                _log.logf_ln("W [udp] Received packet of size %d from %s:%d, but buffer size is %d. Message truncated.", 
                     packet_size, 
                     udp.rempveIP().toString().c_str(),
                     udp.removePort(,
                     buffer_size
                 );
             else
-                log.logf_ln("I [udp] Received packet of size %d from %s:%d",
+                _log.logf_ln("I [udp] Received packet of size %d from %s:%d",
                     packet_size,
                     udp.rempveIP().toString().c_str(),
                     udp.removePort()
@@ -49,7 +55,7 @@ class UdpListener : public Ticking {
 
 public:
     UdpListener(Network &net, int port, UdpDispatcher &dispatcher, Logger &log, int buffer_size = 500) 
-    : network(net), port(port), dispatcher(dispatcher), log(log), buffer_size(buffer_size) { 
+    : network(net), port(port), dispatcher(dispatcher), _log(log), buffer_size(buffer_size) { 
         buffer = new char[buffer_size];
     }
     
@@ -85,9 +91,11 @@ protected:
     Network &net;
     WiFiUDP udp;
     const UdpDispatcher &dispatcher;
-    Logger &log;
+    Logger &_log;
 
     bool start = false;
+
+};
 
 };
 

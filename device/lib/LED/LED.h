@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-namespace mysook;
+namespace mysook {
 
 class LED {
 public:
@@ -24,6 +24,8 @@ public:
 
 private:
     int pin;
-}
+};
+
+};
 
 #endif//__LED_H

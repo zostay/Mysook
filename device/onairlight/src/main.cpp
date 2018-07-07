@@ -1,5 +1,9 @@
 #ifdef ARDUINO
+#include <Adafruit_GFX.h>
+#include <Adafruit_NeoPixel.h>
 #include <Adafruit_NeoMatrix.h>
+
+#include <Wire.h>
 
 #include <MC_Logger.h>
 #include <MC_Panel.h>
@@ -18,7 +22,7 @@
 Adafruit_NeoMatrix matrix(8, 8, 2,
     NEO_MATRIX_TOP + NEO_MATRIX_LEFT +
     NEO_MATRIX_ROWS + NEO_MATRIX_PROGRESSIVE,
-    NEO_GRBW + NEOKHZ800
+    NEO_GRBW + NEO_KHZ800
 );
 
 mysook::MC_Logger<Print> logger(&micros, Serial);
@@ -45,10 +49,9 @@ void setup() {
 }
 
 void loop() {
-    char buf[32];
     if (Wire.available()) {
-        size_t s = Wire.read(buf, 32);
-        sign.send(buf[0], buf+1, s - 1);
+        uint8_t op = Wire.peek();
+        sign.send(op);
     }
     
     sign.loop();

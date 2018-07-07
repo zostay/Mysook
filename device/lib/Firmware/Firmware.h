@@ -127,15 +127,9 @@ public:
 };
 
 class Firmware : public TickingVariableTimer {
-protected:
-    Logger &log;
-
-    TickArray pre_tickers;
-    TickArray post_tickers;
-
 public:
-    Firmware(Logger *log) : Firmware(*log) { }
-    Firmware(Logger &log) : log(log) { 
+    Firmware(Logger *logger) : Firmware(*logger) { }
+    Firmware(Logger &logger) : _log(logger) { 
         next_tick = get_micros();
     }
 
@@ -188,21 +182,27 @@ public:
         post_tickers.run(now);
     }
 
-    virtual void write_log(const char *msg) { log.write_log(msg); }
+    virtual void write_log(const char *msg) { _log.write_log(msg); }
 
     void logf_ln(const char *fmt...) { 
         va_list args;
         va_start(args, fmt);
-        log.vlogf_ln(fmt, args);
+        _log.vlogf_ln(fmt, args);
         va_end(args);
     }
 
-    void logf(const char *fmt...) {
+    void zootff(const char *fmt...) {
         va_list args;
         va_start(args, fmt);
-        log.vlogf(fmt, args);
+        _log.vlogf(fmt, args);
         va_end(args);
     }
+protected:
+    Logger &_log;
+
+    TickArray pre_tickers;
+    TickArray post_tickers;
+
 };
 
 };
