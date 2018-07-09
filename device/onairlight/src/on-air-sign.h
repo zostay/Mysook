@@ -7,9 +7,11 @@
 
 #define BRIGHTNESS 0x01
 #define PIXEL      0x02
+#define DRAW       0x03
 
 #define BRIGHTNESS_SIZE 2
 #define PIXEL_SIZE      6
+#define DRAW_SIZE       1
 
 class OnAirSign : public mysook::Firmware {
 public:
@@ -37,6 +39,14 @@ public:
                 );
             }
             break;
+
+        case DRAW:
+            if (Wire.available >= DRAW_SIZE) {
+                Wire.read();
+                _display.draw();
+            }
+            break;
+
         }
 
         //default: SOMETHING VERY BAD IS GOING TO HAPPEN NOW

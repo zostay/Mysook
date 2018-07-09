@@ -4,9 +4,9 @@
 #include <functional>
 #include <queue>
 
+#include <Color.h>
 #include <Firmware.h>
 #include <Logger.h>
-#include <Bus.h>
 #include <UDP.h>
 #include <LED.h>
 
@@ -17,16 +17,29 @@ using std::placeholders::_2;
 using std::placeholders::_3;
 using std::placeholders::_4;
 
+#define GRID_ADDRESS 42
+
+#define HEAD_SENTINEL 0xBEEF
+#define TAIL_SENTINEL 0xDEAD
+#define MESSAGE_SIZE 197
+
+enum GridMessageOp {
+    OP_NONE,
+    OP_BRIGHTNESS,
+    OP_PIXEL,
+    OP_DRAW,
+};
+    
 struct GridMessage {
     union {
         struct {
             uint16_t head;
 
             uint8_t brightness;
-            Color grid[8][8];
+            mysook::Color grid[8][8];
 
             uint16_t tail;
-        }
+        };
 
         char bytes[MESSAGE_SIZE];
     } message;
@@ -71,8 +84,8 @@ struct GridMessage {
     }
 
     bool is_valid() {
-        return message.head = HEAD_SENTINEL 
-            && message.tail = TAIL_SENTINEL;
+        return message.head == HEAD_SENTINEL 
+            && message.tail == TAIL_SENTINEL;
     }
 };
 
@@ -97,7 +110,7 @@ class OnAirSwitch : public mysook::Firmware {
             );
 
             GridMessage grid;
-            memcp(&grid, buf, len);
+            memcpy(&grid, buf, len);
             if (grid.is_ready()) {
                 logf_ln("I [onairswitch] Valid message received from %s:%d",
                     remote_ip.c_str(),
@@ -108,7 +121,7 @@ class OnAirSwitch : public mysook::Firmware {
             }
             else {
                 logf_ln("E [onairswitch] Invalid message received from %s:%d",
-                    remove_ip.c_str(),
+                    remote_ip.c_str(),
                     remote_port
                 );
             }
@@ -124,9 +137,15 @@ class OnAirSwitch : public mysook::Firmware {
         status_light.off();
     }
 
+    void emit(uint8_t op) {
+        Wire.beginTransmission(GRID_ADDRESS);
+        Wire.write(op);
+        Wire.endTransmission();
+    }
+
     void emit(BrightnessMessage &b) {
         Wire.beginTransmission(GRID_ADDRESS);
-        Wire.write(BRIGHTNESS);
+        Wire.write(OP_BRIGHTNESS);
         Wire.write((char *) &b, sizeof(BrightnessMessage));
         Wire.endTransmission();
 
@@ -134,16 +153,14 @@ class OnAirSwitch : public mysook::Firmware {
 
     void emit(PixelMessage &p) {
         Wire.beginTransmission(GRID_ADDRESS);
-        Wire.write(PIXEL);
+        Wire.write(OP_PIXEL);
         Wire.write((char *) &p, sizeof(PixelMessage));
         Wire.endTransmission();
     }
 
 public:
 
-    using mysook::Firmware;
-
-    OnAirSwitch(mysook::Logger &logger, mysook::Network &network, mysook::LED &status_light, mysook::MessageBus &bus) 
+    OnAirSwitch(mysook::Logger &logger, mysook::Network &network, mysook::LED &status_light) 
     : Firmware(logger), network(network), status_light(status_light),
     udp_server(network, UDP_PORT, dispatcher, logger) {
         this->add_pre_ticker(&network);
@@ -151,7 +168,7 @@ public:
     }
 
     void transmit_message(GridMessage &grid) {
-        BrightnessMessage b = { .brightness=grid.brightness };
+        BrightnessMessage b = { .brightness=grid.message.brightness };
         emit(b);
 
         PixelMessage p;
@@ -159,17 +176,21 @@ public:
             for (uint8_t x = 0; x < 8; ++x) {
                 p.x = x;
                 p.y = y;
-                p.r = grid.grid[x][y].r;
-                p.g = grid.grid[x][y].g;
-                p.b = grid.grid[x][y].b;
+                p.r = grid.message.grid[x][y].r;
+                p.g = grid.message.grid[x][y].g;
+                p.b = grid.message.grid[x][y].b;
                 emit(p);
             }
         }
+
+        emit(OP_DRAW);
 
         logf_ln("I [main] Transmitted grid to I2C bus %d", GRID_ADDRESS);
     }
 
     virtual unsigned long tick_speed() { return 50000ul; }
+
+    virtual void start() {}
 
     virtual void tick() {
         if (network.connecting()) {
@@ -180,8 +201,9 @@ public:
         }
 
         if (mq.size()) {
-            GridMessage grid = mq.pop();
+            GridMessage &grid = mq.front();
             transmit_message(grid);
+            mq.pop();
         }
     }
 
@@ -195,3 +217,5 @@ private:
     mysook::UdpDispatcher dispatcher = std::bind(&OnAirSwitch::handle_udp_packet, this, _1, _2, _3, _4);
     mysook::UdpListener udp_server;
 };
+
+#endif//__ON_AIR_SWITCH_H

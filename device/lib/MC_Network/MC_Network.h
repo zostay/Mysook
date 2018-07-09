@@ -1,14 +1,25 @@
 #ifndef __MC_NETWORK_H
 #define __MC_NETWORK_H
 
+#include <functional>
+
 #include <Arduino.h>
 #include <Network.h>
 #include <Logger.h>
+#ifdef ESP8266
+#include <ESP8266WiFi.h>
+
+#define SYSTEM_EVENT_STA_GOT_IP       WIFI_EVENT_STAMODE_GOT_IP
+#define SYSTEM_EVENT_STA_DISCONNECTED WIFI_EVENT_STAMODE_DISCONNECTED
+#else//ESP8266
 #include <WiFi.h>
+#endif//ESP8266
 
 #define MAX_CONNECTION_MEMORY 10
 #define CONNECTION_TIMEOUT 30000000ul
 #define ANNOUNCEMENT_PERIOD 10000000ul
+
+using std::placeholders::_1;
 
 namespace mysook {
 
@@ -28,7 +39,11 @@ protected:
 
     bool scanning = false;
 
+#ifdef ESP8266
+    bool listening = false;
+#else//ESP8266
     WiFiEventId_t listener_id = 0;
+#endif//ESP8266
 
     bool should_connect = false;
     bool connect_status = false;
@@ -37,7 +52,7 @@ protected:
 
     bool first_time = true;
 
-	void handle_wifi_event(WiFiEvent_t event, WiFiEventInfo_t info) {
+    void handle_wifi_event(WiFiEvent_t event) {
         switch (event) {
             case SYSTEM_EVENT_STA_GOT_IP:
                 connect_status = true;
@@ -136,11 +151,19 @@ protected:
         logger.logf_ln("I [network] Connecting to %s", current->ssid); 
 
         // Make sure we will be notified of a disconnect
+#ifdef ESP8266
+        if (listening) {
+            typedef void EventHandler_t(WiFiEvent_t);
+            std::function<void(WiFiEvent_t)> handler = std::bind(&MC_Network::handle_wifi_event, this, _1);
+            WiFi.onEvent(handler.target<EventHandler_t>());
+        }
+#else//ESP8266
         if (!listener_id) {
             listener_id = WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info) {
-                this->handle_wifi_event(event, info);
+                this->handle_wifi_event(event);
             });
         }
+#endif//ESP8266
 
         // Attempt to connect
         WiFi.begin(current->ssid, current->password);
@@ -189,10 +212,12 @@ public:
         connect_status = false;
         current = 0;
 
+#ifndef ESP8266
         if (listener_id) {
             WiFi.removeEvent(listener_id);
             listener_id = 0;
         }
+#endif//ESP8266
 
         WiFi.disconnect();
     }

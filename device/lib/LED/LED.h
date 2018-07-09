@@ -15,11 +15,13 @@ public:
         return digitalRead(pin) == HIGH;
     }
 
-    bool on() { digitalWrite(pin, HIGH); }
-    bool off() { digitalWrite(pin, LOW); }
+    void on() { digitalWrite(pin, HIGH); }
+    void off() { digitalWrite(pin, LOW); }
 
     bool toggle() {
-        digitalWrite(pin, digitalRead(pin) == HIGH ? LOW : HIGH);
+        bool toggle_to = (digitalRead(pin) == HIGH);
+        digitalWrite(pin, toggle_to ? LOW : HIGH);
+        return toggle_to;
     }
 
 private:

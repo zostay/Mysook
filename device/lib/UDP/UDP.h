@@ -5,6 +5,7 @@
 #include <functional>
 #endif
 
+#include <Firmware.h>
 #include <Network.h>
 
 namespace mysook {
