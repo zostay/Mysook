@@ -1,5 +1,5 @@
-#ifndef __UDP_H
-#define __UDP_H
+#ifndef __MC_UDP_H
+#define __MC_UDP_H
 
 #ifdef NOT_FUNCTIONAL
 #include <functional>
@@ -11,9 +11,9 @@
 namespace mysook {
 
 #ifdef NOT_FUNCTIONAL
-typedef void (*UdpDispatcher)(String&,int,char*,size_t);
+typedef void (*UdpDispatcher)(String&,uint16_t,const char*,size_t);
 #else
-typedef std::function<void(String&,int,char*,size_t)> UdpDispatcher;
+typedef std::function<void(String&,uint16_t,const char*,size_t)> UdpDispatcher;
 #endif
 
 class UdpListener : public Ticking {
@@ -37,26 +37,27 @@ class UdpListener : public Ticking {
             if (packet_size > buffer_size) 
                 _log.logf_ln("W [udp] Received packet of size %d from %s:%d, but buffer size is %d. Message truncated.", 
                     packet_size, 
-                    udp.rempveIP().toString().c_str(),
-                    udp.removePort(,
+                    udp.remoteIP().toString().c_str(),
+                    udp.remotePort(),
                     buffer_size
                 );
             else
                 _log.logf_ln("I [udp] Received packet of size %d from %s:%d",
                     packet_size,
-                    udp.rempveIP().toString().c_str(),
-                    udp.removePort()
+                    udp.remoteIP().toString().c_str(),
+                    udp.remotePort()
                 );
 
-            int len = udp.read(buffer, buffer_size);
-            dispatcher(udp.remoteIP().toString(), udp.remotePort(), buffer, len);
+            size_t len = udp.read(buffer, buffer_size);
+            String remoteIP = udp.remoteIP().toString();
+            dispatcher(remoteIP, udp.remotePort(), buffer, len);
         }
         udp.flush();
     }
 
 public:
     UdpListener(Network &net, int port, UdpDispatcher &dispatcher, Logger &log, int buffer_size = 500) 
-    : network(net), port(port), dispatcher(dispatcher), _log(log), buffer_size(buffer_size) { 
+    : net(net), port(port), dispatcher(dispatcher), _log(log), buffer_size(buffer_size) { 
         buffer = new char[buffer_size];
     }
     
@@ -75,7 +76,7 @@ public:
     virtual bool ready_for_tick(unsigned long now) { return true; }
 
     virtual void tick() {
-        if (start && network.connected())
+        if (start && net.connected())
             ensure_started();
         else
             ensure_stopped();
@@ -91,7 +92,7 @@ protected:
 
     Network &net;
     WiFiUDP udp;
-    const UdpDispatcher &dispatcher;
+    UdpDispatcher &dispatcher;
     Logger &_log;
 
     bool start = false;
@@ -100,5 +101,4 @@ protected:
 
 };
 
-#endif//__UDP_H
-
+#endif//__MC_UDP_H

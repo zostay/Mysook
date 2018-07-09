@@ -10,7 +10,6 @@
 
 #define PIN_CONNECT 2
 
-WiFiUDP udp;
 unsigned int local_udp_port = 10101;
 char incoming[500];
 bool flipflop_connected = false;

@@ -7,7 +7,7 @@
 #include <Color.h>
 #include <Firmware.h>
 #include <Logger.h>
-#include <UDP.h>
+#include <MC_UDP.h>
 #include <LED.h>
 
 #define UDP_PORT 10101
@@ -99,7 +99,7 @@ struct PixelMessage {
 };
 
 class OnAirSwitch : public mysook::Firmware {
-    void handle_udp_packet(String remote_ip, int remote_port, char *buf, size_t len) {
+    void handle_udp_packet(String remote_ip, uint16_t remote_port, const char *buf, size_t len) {
         status_light.on();
 
         if (len == 197) {
