@@ -1,0 +1,13 @@
+CXX=@CXX@
+LD=@CXX@
+CXXFLAGS=@CXXFLAGS@
+
+SRC=src
+
+onairswitch: main.o
+	$(LD) -o $@ $^
+
+.PHONY: clean
+
+clean:
+	rm -rf onairswitch *.o
