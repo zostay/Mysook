@@ -1,2 +1,2 @@
 bin_PROGRAMS = onairswitch
-onairswitch_SOURCES = main.cpp
+onairswitch_SOURCES = main.cpp secrets.h on-air-switch.h 
