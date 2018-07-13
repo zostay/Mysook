@@ -2,3 +2,16 @@
 .piolibdeps
 
 src/secrets.h
+
+Makefile
+Makefile.in
+aclocal.m4
+autom4te.cache
+config.log
+config.status
+configure
+depcomp
+install-sh
+missing
+
+.deps
