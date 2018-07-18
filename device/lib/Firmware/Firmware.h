@@ -191,7 +191,7 @@ public:
         va_end(args);
     }
 
-    void zootff(const char *fmt...) {
+    void logf(const char *fmt...) {
         va_list args;
         va_start(args, fmt);
         _log.vlogf(fmt, args);

@@ -22,7 +22,7 @@ RTC_PCF8523 pfc8523;
 
 mysook::MC_RGBPanel<4,8,Adafruit_NeoMatrix> panel(light);
 mysook::MC_RTC<RTC_PCF8523> rtc(&pfc8523);
-mysook::MC_Logger<Print> logger(&Serial);
+mysook::MC_Logger<Print> logger(micros, &Serial);
 #else
 #include <iostream>
 #include <allegro5/allegro.h>
