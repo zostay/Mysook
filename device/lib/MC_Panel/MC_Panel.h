@@ -14,6 +14,7 @@ class MC_RGBPanel : public RGBPanel<W, H> {
         MC_RGBPanel(M &panel) : panel(panel) { }
 
         virtual void put_pixel(int x, int y, Color c) {
+            panel.setPassThruColor(c.truecolor());
             panel.drawPixel(x, y, panel.Color(c.r, c.g, c.b));
         }
 

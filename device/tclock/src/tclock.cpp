@@ -76,6 +76,28 @@ ColorSetting ToddlerClock::make_transition_color(DateTime &now, ColorSetting &fr
     return c;
 }
 
+uint8_t ToddlerClock::get_color(uint8_t i) {
+    return i == 0 ? config.day_color.r
+         : i == 1 ? config.day_color.g
+         :          config.day_color.b;
+}
+
+void ToddlerClock::set_color(uint8_t i, uint8_t c) {
+    if      (i == 0) config.day_color.r = c;
+    else if (i == 1) config.day_color.g = c;
+    else             config.day_color.b = c;
+}
+
+void ToddlerClock::rotate_colors() {
+    set_color(inc_color, get_color(inc_color) + 1);
+    set_color(dec_color, get_color(dec_color) - 1);
+
+    if (get_color(inc_color) == 255) {
+        inc_color = (inc_color + 1) % 3;
+        dec_color = (dec_color + 1) % 3;
+    }
+}
+
 void ToddlerClock::start() {
     blank_screen();
 }
@@ -97,6 +119,7 @@ void ToddlerClock::tick() {
 
     else if (before_transition_time(now, config.sleeping_time)) {
         logf_ln(" is day.");
+        rotate_colors();
         color_screen(now, config.day_color);
     }
 
