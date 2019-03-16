@@ -10,6 +10,7 @@
 #include <Wire.h>
 
 #include <MC_Logger.h>
+#include <MC_Network.h>
 #include <MC_Panel.h>
 #include <MC_RTC.h>
 
