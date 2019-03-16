@@ -3,6 +3,8 @@
 #define NEOPIXELS 13
 
 #ifdef ARDUINO
+#include "secrets.h"
+
 #include <Adafruit_GFX.h>
 #include <Adafruit_NeoMatrix.h>
 #include <Adafruit_NeoPixel.h>
@@ -53,6 +55,11 @@ void setup() {
     //pfc8523.adjust(DateTime(2018, 11, 4, 0, 15, 0));
 
     Serial.begin(57600);
+
+    for (int i = 0; i < ap_config_count; ++i) {
+        network.add_access_point(ap_configs[i * 2], ap_configs[i * 2 + 1]);
+    }
+    network.connect();
 #else
     if (!al_init()) {
         std::cerr << "failed to initialize allegro" << std::endl;
