@@ -9,6 +9,16 @@
 
 #include <cstdio>
 
+#define PIXEL_RADIUS 40
+#define PIXEL_DIAMETER (PIXEL_RADIUS*2)
+#define PIXEL_SPACE 40
+#define PIXEL_SIZE (PIXEL_DIAMETER+PIXEL_SPACE)
+
+#define PIXEL_RADIUS_F 40.0f
+#define PIXEL_DIAMETER_F (PIXEL_RADIUS_F*2.0f)
+#define PIXEL_SPACE_F 40.0f
+#define PIXEL_SIZE_F (PIXEL_DIAMETER_F+PIXEL_SPACE_F)
+
 namespace mysook {
 
 template <int W, int H>
@@ -29,7 +39,7 @@ const float log255 = log(255.0);
 
 template <int W, int H>
 void SimPanel<W,H>::initialize() {
-    display = al_create_display(W * 80, H * 80);
+    display = al_create_display(W * PIXEL_SIZE, H * PIXEL_SIZE);
 }
 
 template <int W, int H>
@@ -50,7 +60,11 @@ void SimPanel<W,H>::draw() {
             b = (bc        ) * brightness_coeff;
 
             ALLEGRO_COLOR c = al_map_rgb(r, g, b);
-            al_draw_filled_circle(cx*160.0f + 80.0f, cy*160.0f + 80.0f, 40.0f, c);
+            al_draw_filled_circle(
+                cx*PIXEL_SIZE_F + PIXEL_SPACE_F, 
+                cy*PIXEL_SIZE_F + PIXEL_SPACE_F, 
+                PIXEL_RADIUS_F, c
+            );
         }
     }
 

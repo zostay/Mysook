@@ -23,6 +23,7 @@ RTC_PCF8523 pfc8523;
 mysook::MC_RGBPanel<4,8,Adafruit_NeoMatrix> panel(light);
 mysook::MC_RTC<RTC_PCF8523> rtc(&pfc8523);
 mysook::MC_Logger<Print> logger(micros, &Serial);
+mysook::MC_Network network(logger);
 #else
 #include <iostream>
 #include <allegro5/allegro.h>
@@ -48,6 +49,7 @@ void setup() {
     //pfc8523.adjust(DateTime(F(__DATE__), F(__TIME__)));
     //pfc8523.adjust(DateTime(2018, 5, 15, 18, 58, 55));
     //pfc8523.adjust(DateTime(2018, 5, 15, 7, 0, 55));
+    //pfc8523.adjust(DateTime(2018, 11, 4, 0, 15, 0));
 
     Serial.begin(57600);
 #else
