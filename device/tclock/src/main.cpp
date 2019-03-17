@@ -62,6 +62,8 @@ void setup() {
         network.add_access_point(ap_configs[i * 2], ap_configs[i * 2 + 1]);
     }
     network.connect();
+
+    mdns.add_service("http", "tcp", 80);
 #else
     if (!al_init()) {
         std::cerr << "failed to initialize allegro" << std::endl;
