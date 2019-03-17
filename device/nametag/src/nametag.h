@@ -23,6 +23,7 @@ private:
     mysook::RGBPanel<12,6> &matrix;
     mysook::Network &network;
     mysook::WebServer web_server;
+    mysook::Logger &log;
 
     VM<12,6> builtin;
     VM<12,6> *vm;
@@ -35,7 +36,7 @@ private:
 
 public:
     NameTag(mysook::Logger &log, mysook::RGBPanel<12,6> &_matrix, mysook::Network &network) 
-    : Firmware(log), matrix(_matrix), network(network), web_server(network, dispatcher, log), builtin(log, _matrix, default_program, PROGRAM_MAIN) { 
+    : Firmware(log), matrix(_matrix), network(network), web_server(network, dispatcher, log), builtin(log, _matrix, default_program, PROGRAM_MAIN), log(log) { 
         this->add_pre_ticker(&network);
         this->add_pre_ticker(&web_server);
 
