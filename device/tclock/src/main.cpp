@@ -12,6 +12,7 @@
 #include <Wire.h>
 
 #include <MC_Logger.h>
+#include <MC_MDNS.h>
 #include <MC_Network.h>
 #include <MC_Panel.h>
 #include <MC_RTC.h>
@@ -27,6 +28,7 @@ mysook::MC_RGBPanel<4,8,Adafruit_NeoMatrix> panel(light);
 mysook::MC_RTC<RTC_PCF8523> rtc(&pfc8523);
 mysook::MC_Logger<Print> logger(micros, &Serial);
 mysook::MC_Network network(logger);
+mysook::MC_MDNS mdns("isaiah-clock", logger);
 #else
 #include <iostream>
 #include <allegro5/allegro.h>

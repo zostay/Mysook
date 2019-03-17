@@ -1,4 +1,4 @@
-CPPFLAGS=-std=c++14 -c -g -Wall -I/usr/local/include -I../lib/SimPanel -I../lib/SimRTC -I../lib/SimLogger -I../lib/Firmware -I../lib/Logger -I../lib/Panel -I../lib/RTC -Isrc -I../lib/Color -I../lib/Canvas32 -I../lib/Sim_Adafruit_GFX -I../lib/Simduino
+CPPFLAGS=-std=c++14 -c -g -Wall -I/usr/local/include -I../lib/SimPanel -I../lib/SimRTC -I../lib/SimLogger -I../lib/Firmware -I../lib/Logger -I../lib/Panel -I../lib/RTC -Isrc -I../lib/Color -I../lib/Canvas32 -I../lib/Sim_Adafruit_GFX -I../lib/Simduino -I../lib/MC_MDNS
 LDFLAGS=-Wall -g -L/usr/local/lib
 LIBS=-lallegro -lallegro_main -lallegro_primitives
 
