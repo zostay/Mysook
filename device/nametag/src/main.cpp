@@ -30,6 +30,7 @@ Adafruit_DotStarMatrix matrix = Adafruit_DotStarMatrix(
 mysook::MC_Logger<Print> logger(&micros, Serial);
 mysook::MC_RGBPanel<12,6,Adafruit_DotStarMatrix> display(matrix);
 mysook::MC_Network network(logger);
+mysook::MC_MDNS mdns("zostay-nametag", logger);
 #else
 mysook::SimLogger logger;
 mysook::SimPanel<12,6> display;
@@ -54,6 +55,8 @@ void setup() {
         network.add_access_point(ap_configs[i * 2], ap_configs[i * 2 + 1]);
     }
     network.connect();
+
+    mdns.add_service("http", "tcp", 80);
 #endif//ARDUINO
 
     nametag.setup();

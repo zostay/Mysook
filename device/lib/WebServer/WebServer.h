@@ -644,15 +644,6 @@ public:
     }
 
     void begin() {
-        if (!MDNS.begin("nametag-zostay")) {
-            log.logf_ln("E [webserver] unable to configure mDNS responder");
-        }
-        else {
-            log.logf_ln("I [webserver] mDNS responding to nametag-zostay.local");
-        }
-
-        MDNS.addService("http", "tcp", 80);
-
         start = true;
     }
 
