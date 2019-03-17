@@ -55,9 +55,9 @@ void SimPanel<W,H>::draw() {
 
             uint32_t &bc = buffer[xy];
             uint8_t r, g, b;
-            r = (bc >> 0x10) * brightness_coeff;
-            g = (bc >> 0x08) * brightness_coeff;
-            b = (bc        ) * brightness_coeff;
+            r = ((bc & 0xFF0000) >> 0x10) * brightness_coeff;
+            g = ((bc & 0x00FF00) >> 0x08) * brightness_coeff;
+            b = ((bc & 0x0000FF)        ) * brightness_coeff;
 
             ALLEGRO_COLOR c = al_map_rgb(r, g, b);
             al_draw_filled_circle(
