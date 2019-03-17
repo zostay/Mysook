@@ -153,9 +153,12 @@ protected:
         // Make sure we will be notified of a disconnect
 #ifdef ESP8266
         if (listening) {
-            typedef void EventHandler_t(WiFiEvent_t);
-            std::function<void(WiFiEvent_t)> handler = std::bind(&MC_Network::handle_wifi_event, this, _1);
-            WiFi.onEvent(handler.target<EventHandler_t>());
+            WiFi.onStationModeGotIP([this](const WiFiEventStationModeGotIP &) {
+                this->handle_wifi_event(SYSTEM_EVENT_STA_GOT_IP);
+            });
+            WiFi.onStationModeDisconnected([this](const WiFiEventStationModeDisconnected &) {
+                this->handle_wifi_event(SYSTEM_EVENT_STA_DISCONNECTED);
+            });
         }
 #else//ESP8266
         if (!listener_id) {
