@@ -1,0 +1,40 @@
+{
+  "auth": "github.zostay",
+  "version": "0.0.0",
+  "name": "TClock",
+  "author": "Andrew Sterling Hanenkamp",
+  "build-depends": [
+
+  ],
+  "test-depends": [
+    "Test",
+    "Test::META"
+  ],
+  "provides": {
+      "TClock": "lib/TClock.pm6"
+  },
+  "authors": [
+    "Sterling Hanenkamp <hanenkamp@cpan.org>"
+  ],
+  "tags": [
+
+  ],
+  "license": "Artistic-2.0",
+  "support": {
+    "source": "git://github.com/zostay/Mysook.git"
+  },
+  "resources": [
+
+  ],
+  "depends": [
+      "Amazon::DynamoDB",
+      "Cofra",
+      "JSON::Fast",
+      "Smack",
+      "ULID"
+  ],
+  "description": "Toddler clock IoT services",
+  "perl": "6.c",
+  "source-url": "git://github.com/zostay/Mysook.git",
+  "meta-version": "0"
+}

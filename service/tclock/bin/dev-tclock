@@ -1,0 +1,16 @@
+#!/bin/zsh
+
+export DEPLOYMENT_STAGE=development
+
+BIN_DIR=$(dirname $0)
+ROOT_DIR=$(dirname $BIN_DIR)
+
+docker run -d --rm --name dynamodb-dev -v "$PWD":/dynamodb_local_db -p 8000:8000 cnadiminti/dynamodb-local:latest
+trap 'docker kill dynamodb-dev' INT EXIT
+
+perl6 \
+    -I$ROOT_DIR/lib \
+    -I$HOME/projects/perl6/Cofra/lib \
+    $BIN_DIR/tclock.p6 \
+        --ddb-hostname=localhost \
+        --ddb-port=8000
