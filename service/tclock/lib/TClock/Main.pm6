@@ -47,34 +47,50 @@ has TClock::Biz::Alarm $.alarm-biz is constructed is construction-args(
     )
 );
 
+use TClock::Biz::TimeZone;
+has TClock::Biz::TimeZone $.time-zone-biz is constructed;
+
 use TClock::Biz::Time;
-has TClock::Biz::Time $.time-biz is constructed;
+has TClock::Biz::Time $.time-biz is constructed is construction-args(
+    \(
+        time-zone => dep('time-zone-biz'),
+    )
+);
 
 has Hash[Cofra::Biz] $.bizzes is constructed is construction-args(
     \(
-        alarm => dep('alarm-biz'),
-        time  => dep('time-biz'),
+        alarm     => dep('alarm-biz'),
+        time      => dep('time-biz'),
+        time-zone => dep('time-zone-biz'),
     )
 );
 
 use TClock::Web::Controller::Alarm;
 has TClock::Web::Controller::Alarm $.alarm-controller is constructed is construction-args(
     \(
-        alarm => dep('alarm-controller'),
+        alarm => dep('alarm-biz'),
     )
 );
 
 use TClock::Web::Controller::Time;
 has TClock::Web::Controller::Time $.time-controller is constructed is construction-args(
     \(
-        time => dep('time-controller'),
+        time => dep('time-biz'),
+    )
+);
+
+use TClock::Web::Controller::TimeZone;
+has TClock::Web::Controller::TimeZone $.time-zone-controller is constructed is construction-args(
+    \(
+        time-zone => dep('time-zone-biz'),
     )
 );
 
 has Hash[Cofra::Web::Controller] $.controllers is constructed is construction-args(
     \(
-        alarm => dep('alarm-controller'),
-        time  => dep('time-controller'),
+        alarm     => dep('alarm-controller'),
+        time      => dep('time-controller'),
+        time-zone => dep('time-zone-controller'),
     )
 );
 
