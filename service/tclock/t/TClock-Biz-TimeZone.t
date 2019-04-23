@@ -4,9 +4,9 @@ use Test;
 use Cofra::Biz;
 use TClock::Biz::Time;
 
-my TClock::Biz::TimeZone $time-zone .= new(
-    tz-file => $*TMPDIR.add(rand ~ '.json'),
-);
+my $tz-file = $*TMPDIR.add(rand ~ '.json');
+my TClock::Biz::TimeZone $time-zone .= new(:$tz-file);
+END $tz-file.unlink;
 
 ok $time-zone.defined;
 

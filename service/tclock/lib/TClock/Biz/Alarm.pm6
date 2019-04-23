@@ -5,27 +5,29 @@ use JSON::Class;
 
 unit class TClock::Biz::Alarm is Cofra::Biz;
 
-has IO::Path $.config-dir is required;
+has IO::Path $.alarm-file is required;
 
 package GLOBAL::TClock::Model {
     subset Hour of Int where 24 > * >= 0;
     subset Minute of Int where 60 > * >= 0;
 
     class TimeSetting does JSON::Class {
-        has Hour $.hour is required;
-        has Minute $.minute is required;
+        has Hour $.hour is rw is required;
+        has Minute $.minute is rw is required;
 
         method enmesh(%input) {
             $!hour   = %input<hour>   with %input<hour>;
             $!minute = %input<minute> with %input<minute>;
         }
+
+        method tuple() { ($!hour, $!minute) }
     }
 
     subset ColorComponent of Int where 256 > * >= 0;
 
     class ColorSetting does JSON::Class {
-        has ColorComponent ($.red, $.green, $.blue) is required;
-        has ColorComponent $.brightness is required;
+        has ColorComponent ($.red, $.green, $.blue) is rw is required;
+        has ColorComponent $.brightness is rw is required;
 
         method enmesh(%input) {
             $!red        = %input<red>        with %input<red>;
@@ -33,13 +35,15 @@ package GLOBAL::TClock::Model {
             $!blue       = %input<blue>       with %input<blue>;
             $!brightness = %input<brightness> with %input<brightness>;
         }
+
+        method tuple() { ($!red, $!green, $!blue, $!brightness) }
     }
 
     class Alarm does JSON::Class {
-        has TimeSetting $.morning-time .= new(:7h, :10m);
-        has TimeSetting $.sleeping-time .= new(:19h, :0m);
-        has ColorSetting $.night-color .= new(:255r, :170g, :0b, :2brightness);
-        has ColorSetting $.day-color .= new(:0r, :80g, :255b, :5brightness);
+        has TimeSetting $.morning-time .= new(:7hour, :10minute);
+        has TimeSetting $.sleeping-time .= new(:19hour, :0minute);
+        has ColorSetting $.night-color .= new(:255red, :170green, :0blue, :2brightness);
+        has ColorSetting $.day-color .= new(:0red, :80green, :255blue, :5brightness);
 
         method enmesh(%input) {
             $!morning-time.enmesh(%input<morning-time>)
@@ -53,8 +57,6 @@ package GLOBAL::TClock::Model {
         }
     }
 }
-
-method alarm-file(--> IO::Path:D) { $!config-dir.add('alarm.json') }
 
 method fetch(--> TClock::Model::Alarm:D) {
     if $.alarm-file.f {

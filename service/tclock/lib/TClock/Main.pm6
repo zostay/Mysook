@@ -12,6 +12,13 @@ use TClock;
 
 has IO::Path $.config-dir is required;
 
+method json-config-file-name(:$name) {
+    self.config-dir.add($name);
+}
+
+has IO::Path $.tz-file is factory(&json-config-file-name);
+has IO::Path $.alarm-file is factory(&json-config-file-name);
+
 # has Str $.ddb-hostname is required;
 # has Int $.ddb-port = 8000;
 # has Str $.alarm-table = 'TClockAlarm';
@@ -43,12 +50,16 @@ has TClock $.app is constructed is construction-args(
 use TClock::Biz::Alarm;
 has TClock::Biz::Alarm $.alarm-biz is constructed is construction-args(
     \(
-        config-dir => dep,
+        alarm-file => dep,
     )
 );
 
 use TClock::Biz::TimeZone;
-has TClock::Biz::TimeZone $.time-zone-biz is constructed;
+has TClock::Biz::TimeZone $.time-zone-biz is constructed is construction-args(
+    \(
+        tz-file => dep,
+    )
+);
 
 use TClock::Biz::Time;
 has TClock::Biz::Time $.time-biz is constructed is construction-args(
