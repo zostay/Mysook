@@ -27,7 +27,6 @@
 
   ],
   "depends": [
-      "Amazon::DynamoDB",
       "Cofra",
       "JSON::Fast",
       "Smack",

@@ -17,9 +17,6 @@ sub MAIN(
     );
     my $application = $main.app;
 
-    note "Using local DynamoDB http://$_:$main.ddb-port()/ ..."
-        with $main.ddb-hostname;
-
     my $server = $main.web-server;
     $server.run;
 }

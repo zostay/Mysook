@@ -12,34 +12,15 @@ use TClock;
 
 has IO::Path $.config-dir is required;
 
-method json-config-file-name(:$name) {
+my method json-config-file-name(:$name) {
     self.config-dir.add($name);
 }
 
 has IO::Path $.tz-file is factory(&json-config-file-name);
 has IO::Path $.alarm-file is factory(&json-config-file-name);
 
-# has Str $.ddb-hostname is required;
-# has Int $.ddb-port = 8000;
-# has Str $.alarm-table = 'TClockAlarm';
-#
-# use Amazon::DynamoDB;
-# has Amazon::DynamoDB $.ddb is factory(anon method build-ddb {
-#     if $.ddb-hostname {
-#         Amazon::DynamoDB.new(
-#             scheme => 'http',
-#             hostname => $.ddb-hostname,
-#             |(do with $.ddb-port { port => $.ddb-port }),
-#         );
-#     }
-#     else {
-#         Amazon::DynamoDB.new;
-#     }
-# });
-
 has TClock $.app is constructed is construction-args(
     \(
-        ddb    => dep,
         logger => dep,
         bizzes => dep,
     )
