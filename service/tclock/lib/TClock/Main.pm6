@@ -86,8 +86,8 @@ has Hash[Cofra::Web::Controller] $.controllers is constructed is construction-ar
     )
 );
 
-use Cofra::Web::View::JSON;
-has Cofra::Web::View::JSON $.json-view is constructed;
+use Cofra::Web::View::JSONMarshal;
+has Cofra::Web::View::JSONMarshal $.json-view is constructed;
 
 has Hash[Cofra::Web::View] $.views is constructed is construction-args(
     \(
