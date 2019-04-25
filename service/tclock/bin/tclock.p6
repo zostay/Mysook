@@ -15,7 +15,6 @@ sub MAIN(
         |(do with $stage { :$stage }),
         config-dir => $config-dir.IO,
     );
-    my $application = $main.app;
 
     my $server = $main.web-server;
     $server.run;

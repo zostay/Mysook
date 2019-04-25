@@ -14,4 +14,5 @@ ROOT_DIR=$(dirname $BIN_DIR)
 perl6 \
     -I$ROOT_DIR/lib \
     -I$HOME/projects/perl6/Cofra/lib \
+    -I$HOME/projects/perl6/Smack/lib \
     $BIN_DIR/tclock.p6

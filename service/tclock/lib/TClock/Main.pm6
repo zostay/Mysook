@@ -51,9 +51,9 @@ has TClock::Biz::Time $.time-biz is constructed is construction-args(
 
 has Hash[Cofra::Biz] $.bizzes is constructed is construction-args(
     \(
-        alarm     => dep('alarm-biz'),
-        time      => dep('time-biz'),
-        time-zone => dep('time-zone-biz'),
+        'alarm',     dep('alarm-biz'),
+        'time',      dep('time-biz'),
+        'time-zone', dep('time-zone-biz'),
     )
 );
 
@@ -80,9 +80,9 @@ has TClock::Web::Controller::TimeZone $.time-zone-controller is constructed is c
 
 has Hash[Cofra::Web::Controller] $.controllers is constructed is construction-args(
     \(
-        alarm     => dep('alarm-controller'),
-        time      => dep('time-controller'),
-        time-zone => dep('time-zone-controller'),
+        'alarm',     dep('alarm-controller'),
+        'time',      dep('time-controller'),
+        'time-zone', dep('time-zone-controller'),
     )
 );
 
@@ -91,7 +91,7 @@ has Cofra::Web::View::JSON $.json-view is constructed;
 
 has Hash[Cofra::Web::View] $.views is constructed is construction-args(
     \(
-        json => dep('json-view'),
+        'JSON', dep('json-view'),
     )
 );
 
