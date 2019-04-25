@@ -12,6 +12,27 @@ submethod ROUTE {
         ),
     );
 
+    get 'time/:c' => %(
+        defaults => %(
+            controller => 'time',
+            action     => 'fetch',
+        ),
+    );
+
+    get 'time-zone' => %(
+        defaults => %(
+            controller => 'time-zone',
+            action     => 'fetch',
+        ),
+    );
+
+    put 'time-zone' => %(
+        defaults => %(
+            controller => 'time-zone',
+            action     => 'store',
+        ),
+    );
+
     get 'alarm' => %(
         defaults => %(
             controller => 'alarm',
