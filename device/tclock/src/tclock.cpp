@@ -2,10 +2,13 @@
 
 using namespace mysook;
 
-ToddlerClock::ToddlerClock(Logger *log, RGBPanel<4,8> *panel, RTC *rtc) 
+ToddlerClock::ToddlerClock(TClockConfig *configger, Logger *log, RGBPanel<4,8> *panel, RTC *rtc) 
 : Firmware(log) {
-    this->panel = panel;
-    this->rtc   = rtc;
+    this->configger = configger;
+    this->panel     = panel;
+    this->rtc       = rtc;
+
+    pre_tickers.add(this->configger);
 }
 
 ToddlerClock::~ToddlerClock() { }
