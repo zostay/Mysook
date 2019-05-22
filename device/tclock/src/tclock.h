@@ -9,19 +9,25 @@
 #include <Panel.h>
 #include <RTC.h>
 
+#ifdef NAMETAG
+#define LIGHT_WIDTH 6
+#define LIGHT_HEIGHT 12
+#elif
+#define LIGHT_WIDTH 4
+#define LIGHT_HEIGHT 8
+#endif
+
 class ToddlerClock : public mysook::Firmware {
 private:
-    friend class TClockConfig;
-
     TClockConfig *configger;
-    mysook::RGBPanel<4, 8> *panel;
+    mysook::RGBPanel<LIGHT_WIDTH, LIGHT_HEIGHT> *panel;
     mysook::RTC *rtc;
 
     ToddlerClockConfig config = {
         .morning_time = { .h=7, .m=10 },
         .sleeping_time = { .h=19, .m=0 },
         .night_color = { .r=255u, .g=170u, .b=0u, .brightness=2u },
-        .day_color = { .r=0u, .g=80u, .b=255u, .brightness=5u }
+        .day_color = { .r=0u, .g=80u, .b=255u, .brightness=40u }
     };
 
     void blank_screen();
@@ -35,8 +41,8 @@ private:
     ColorSetting make_transition_color(mysook::DateTime &now, ColorSetting &from, ColorSetting &to);
 
 public:
-    ToddlerClock(mysook::Logger *log, mysook::RGBPanel<4,8> *panel, mysook::RTC *rtc);
-    ~ToddlerClock();
+    ToddlerClock(mysook::Logger *log, mysook::RGBPanel<LIGHT_WIDTH,LIGHT_HEIGHT> *panel, mysook::RTC *rtc);
+    virtual ~ToddlerClock();
 
     virtual void start();
     virtual void tick();

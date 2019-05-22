@@ -33,6 +33,7 @@ protected:
 class RTC {
 public:
     virtual DateTime now() = 0;
+    virtual void adjust(const DateTime &newNow) = 0;
 };
 
 };

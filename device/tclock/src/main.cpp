@@ -1,13 +1,17 @@
+#include "tclock_config.h"
 #include "tclock.h"
 
+#ifdef NAMETAG
+#define DATAPIN  27
+#define CLOCKPIN 13
+#elif
 #define NEOPIXELS 13
+#endif
 
 #ifdef ARDUINO
 #include "secrets.h"
 
 #include <Adafruit_GFX.h>
-#include <Adafruit_NeoMatrix.h>
-#include <Adafruit_NeoPixel.h>
 #include <RTClib.h>
 #include <Wire.h>
 
@@ -17,15 +21,37 @@
 #include <MC_Panel.h>
 #include <MC_RTC.h>
 
-Adafruit_NeoMatrix light = Adafruit_NeoMatrix(4, 8, NEOPIXELS,
-  NEO_MATRIX_TOP     + NEO_MATRIX_RIGHT +
-  NEO_MATRIX_COLUMNS + NEO_MATRIX_PROGRESSIVE,
-  NEO_GRB            + NEO_KHZ800);
+#ifdef NAMETAG
+#include <Adafruit_DotStarMatrix.h>
 
-RTC_PCF8523 pfc8523;
+typedef Adafruit_DotStarMatrix LightMatrix;
+Adafruit_DotStarMatrix light = Adafruit_DotStarMatrix(
+    LIGHT_WIDTH, LIGHT_HEIGHT, DATAPIN, CLOCKPIN,
+    DS_MATRIX_BOTTOM  + DS_MATRIX_LEFT +
+    DS_MATRIX_COLUMNS + DS_MATRIX_PROGRESSIVE,
+    DOTSTAR_BGR);
+#elif
+#include <Adafruit_NeoMatrix.h>
+#include <Adafruit_NeoPixel.h>
 
-mysook::MC_RGBPanel<4,8,Adafruit_NeoMatrix> panel(light);
-mysook::MC_RTC<RTC_PCF8523> rtc(&pfc8523);
+typedef Adafruit_NeoMatrix LightMatrix;
+Adafruit_NeoMatrix light = Adafruit_NeoMatrix(
+    LIGHT_WIDTH, LIGHT_HEIGHT, NEOPIXELS,
+    NEO_MATRIX_TOP     + NEO_MATRIX_RIGHT +
+    NEO_MATRIX_COLUMNS + NEO_MATRIX_PROGRESSIVE,
+    NEO_GRB            + NEO_KHZ800);
+#endif
+
+#ifdef NAMETAG
+typedef RTC_Millis MyRTC;
+#elif
+typedef RTC_PCF8523 MyRTC;
+#endif
+
+MyRTC rtc_chip;
+
+mysook::MC_RGBPanel<LIGHT_WIDTH,LIGHT_HEIGHT,LightMatrix> panel(light);
+mysook::MC_RTC<MyRTC> rtc(&rtc_chip);
 mysook::MC_Logger<Print> logger(micros, &Serial);
 mysook::MC_Network network(logger);
 mysook::MC_MDNS mdns("isaiah-clock", logger);
@@ -46,24 +72,34 @@ ToddlerClock tclock(&logger, &panel, &rtc);
 
 void setup() {
 #ifdef ARDUINO
+#ifdef NAMETAG
+    pinMode(DATAPIN, OUTPUT);
+    pinMode(CLOCKPIN, OUTPUT);
+#elif
     pinMode(NEOPIXELS, OUTPUT);
+#endif
 
     light.begin();
-    pfc8523.begin();
 
-    //pfc8523.adjust(DateTime(F(__DATE__), F(__TIME__)));
-    //pfc8523.adjust(DateTime(2018, 5, 15, 18, 58, 55));
-    //pfc8523.adjust(DateTime(2018, 5, 15, 7, 0, 55));
-    //pfc8523.adjust(DateTime(2018, 11, 4, 0, 15, 0));
+#ifdef NAMETAG
+    rtc_chip.begin(DateTime(F(__DATE__), F(__TIME__)));
+#elif
+    rtc_chip.begin();
 
-    Serial.begin(57600);
+    //rtc_chip.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    //rtc_chip.adjust(DateTime(2018, 5, 15, 18, 58, 55));
+    //rtc_chip.adjust(DateTime(2018, 5, 15, 7, 0, 55));
+    //rtc_chip.adjust(DateTime(2018, 11, 4, 0, 15, 0));
+#endif
+
+    Serial.begin(115200);
 
     for (int i = 0; i < ap_config_count; ++i) {
         network.add_access_point(ap_configs[i * 2], ap_configs[i * 2 + 1]);
     }
     network.connect();
 
-    mdns.add_service("http", "tcp", 80);
+    //mdns.add_service("http", "tcp", 80);
 #else
     if (!al_init()) {
         std::cerr << "failed to initialize allegro" << std::endl;

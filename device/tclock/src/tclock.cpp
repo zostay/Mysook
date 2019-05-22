@@ -2,19 +2,22 @@
 
 using namespace mysook;
 
-ToddlerClock::ToddlerClock(TClockConfig *configger, Logger *log, RGBPanel<4,8> *panel, RTC *rtc) 
+ToddlerClock::ToddlerClock(Logger *log, RGBPanel<LIGHT_WIDTH,LIGHT_HEIGHT> *panel, RTC *rtc) 
 : Firmware(log) {
-    this->configger = configger;
     this->panel     = panel;
     this->rtc       = rtc;
 
-    pre_tickers.add(this->configger);
+    this->configger = new TClockConfig(log, config, rtc);
+
+    //pre_tickers.add(this->configger);
 }
 
-ToddlerClock::~ToddlerClock() { }
+ToddlerClock::~ToddlerClock() { 
+    delete configger;
+}
 
 void ToddlerClock::blank_screen() {
-    panel->set_brightness(5);
+    panel->set_brightness(20);
     panel->fill_screen(0, 0, 0);
     panel->draw();
 }
@@ -23,8 +26,8 @@ void ToddlerClock::color_screen(DateTime &d, uint8_t r, uint8_t g, uint8_t b, ui
     panel->set_brightness(brightness);
 
     int stagger = d.day() % 2;
-    for (int x = 0; x < 4; ++x) {
-        for (int y = 0; y < 8; ++y) {
+    for (int x = 0; x < panel->panel_width(); ++x) {
+        for (int y = 0; y < panel->panel_height(); ++y) {
             if ((x + y + stagger) % 2 == 0) {
                 //logf_ln("Set pixel (%d, %d) to (#%02x%02x%02x)", x, y, r, g, b);
                 panel->put_pixel(x, y, r, g, b);
