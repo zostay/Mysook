@@ -26,29 +26,45 @@
 #define URL_TIME      URL_API "/time"
 #define URL_ALARM     URL_API "/alarm"
 
-class TClockConfig : public mysook::Ticking {
+class TClockConfig : public mysook::TickingVariableTimer {
 private:
-    mysook::Logger *log;
+    mysook::Logger &log;
     mysook::Network &network;
     ToddlerClockConfig &clock;
     mysook::RTC *rtc = 0;
     bool ran_already = false;
+    bool pinged = false;
 
     HTTPClient ua;
 
 public:
-    TClockConfig(mysook::Logger *log, mysook::Network &network, ToddlerClockConfig &clock, mysook::RTC *rtc) : log(log), network(network), clock(clock), rtc(rtc) { }
+    TClockConfig(
+        mysook::Logger &log, 
+        mysook::Network &network, 
+        ToddlerClockConfig &clock, 
+        mysook::RTC *rtc
+    ) : log(log), 
+        network(network), 
+        clock(clock), 
+        rtc(rtc) { }
+
     virtual ~TClockConfig() { }
 
-    virtual bool ready_for_tick(unsigned long) { 
-        if (ran_already) return false;
-        if (!network.connected()) return false;
-        ran_already = true;
-        return true;
-    }
+	virtual unsigned long tick_speed() { return 10000000UL; }
+
+	virtual bool ready_for_tick(unsigned long c) {
+		if (!network.connected()) return false;
+		return mysook::TickingVariableTimer::ready_for_tick(c);
+	}
+    //virtual bool ready_for_tick(unsigned long c) { 
+    //    if (ran_already) return false;
+    //    if (!network.connected()) return false;
+    //    ran_already = true;
+    //    return true;
+    //}
 
     virtual void tick() {
-        fetch_time();
+        if (!pinged) fetch_time();
         fetch_alarm();
     }
 
@@ -56,12 +72,12 @@ public:
         ua.begin(String(URL_TIME));
         int code;
         if ((code = ua.GET()) <= 0) {
-            log->logf_ln("E [tclock_config] unable to fetch time from %s : (%d) %s", URL_TIME, code, ua.errorToString(code));
+            log.logf_ln("E [tclock_config] unable to fetch time from %s : (%d) %s", URL_TIME, code, ua.errorToString(code));
             return;
         }
 
         if (code != 200) {
-            log->logf_ln("E [tclock_config] unexpected HTTP status code %d from %s", code, URL_TIME);
+            log.logf_ln("E [tclock_config] unexpected HTTP status code %d from %s", code, URL_TIME);
             return;
         }
 
@@ -70,7 +86,7 @@ public:
         StaticJsonDocument<200> dt;
         auto error = deserializeJson(dt, payload);
         if (error) {
-            log->logf_ln("E [tclock_config] unable to read JSON %s", error.c_str());
+            log.logf_ln("E [tclock_config] unable to read JSON %s", error.c_str());
             return;
         }
 
@@ -85,7 +101,7 @@ public:
 
         rtc->adjust(new_now);
 
-        log->logf_ln("I [tclock_config] Adjusted time to %04d-%02d-%02d %02d:%02d:%02d",
+        log.logf_ln("I [tclock_config] Adjusted time to %04d-%02d-%02d %02d:%02d:%02d",
             new_now.year(),
             new_now.month(),
             new_now.day(),
@@ -100,12 +116,12 @@ public:
 
         int code;
         if ((code = ua.GET()) <= 0) {
-            log->logf_ln("E [tclock_error] unable to fetch alarm from %s", URL_ALARM);
+            log.logf_ln("E [tclock_error] unable to fetch alarm from %s", URL_ALARM);
             return;
         }
 
         if (code != 200) {
-            log->logf_ln("E [tclock_config] unexpected HTTP status code %d from %s", code, URL_TIME);
+            log.logf_ln("E [tclock_config] unexpected HTTP status code %d from %s", code, URL_TIME);
             return;
         }
 
@@ -114,7 +130,7 @@ public:
         StaticJsonDocument<500> al;
         auto error = deserializeJson(al, payload);
         if (error) {
-            log->logf_ln("E [tclock_error] unable to read JSON %s", error.c_str());
+            log.logf_ln("E [tclock_error] unable to read JSON %s", error.c_str());
             return;
         }
 
@@ -122,14 +138,14 @@ public:
 
         clock.morning_time.h = al["morning-time"]["hour"];
         clock.morning_time.m = al["morning-time"]["minute"];
-        log->logf_ln("I [tclock_config] morning time is %02d:%02d", 
+        log.logf_ln("I [tclock_config] morning time is %02d:%02d", 
             clock.morning_time.h,
             clock.morning_time.m
         );
 
         clock.sleeping_time.h = al["sleeping-time"]["hour"];
         clock.sleeping_time.m = al["sleeping-time"]["minute"];
-        log->logf_ln("I [tclock_config] sleeping time is %02d:%02d", 
+        log.logf_ln("I [tclock_config] sleeping time is %02d:%02d", 
             clock.sleeping_time.h,
             clock.sleeping_time.m
         );
@@ -138,7 +154,7 @@ public:
         clock.night_color.g = al["night-color"]["green"];
         clock.night_color.b = al["night-color"]["blue"];
         clock.night_color.brightness = al["night-color"]["brightness"];
-        log->logf_ln("I [tclock_config] night color is (%d, %d, %d) at %d",
+        log.logf_ln("I [tclock_config] night color is (%d, %d, %d) at %d",
             clock.night_color.r,
             clock.night_color.g,
             clock.night_color.b,
@@ -149,12 +165,20 @@ public:
         clock.day_color.g = al["day-color"]["green"];
         clock.day_color.b = al["day-color"]["blue"];
         clock.day_color.brightness = al["day-color"]["brightness"];
-        log->logf_ln("I [tclock_config] day color is (%d, %d, %d) at %d",
+        log.logf_ln("I [tclock_config] day color is (%d, %d, %d) at %d",
             clock.day_color.r,
             clock.day_color.g,
             clock.day_color.b,
             clock.day_color.brightness
         );
+    }
+
+    void ping() {
+        log.logf_ln("I [tclock_config] ping received");
+
+        // If we receive any UDP packet, check config again on next tick
+        pinged = true;
+        next_tick_after(0);
     }
 };
 

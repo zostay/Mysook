@@ -5,6 +5,8 @@
 #include <functional>
 #endif
 
+#include <WifiUDP.h>
+
 #include <Firmware.h>
 #include <Network.h>
 
@@ -18,20 +20,24 @@ typedef std::function<void(String&,uint16_t,const char*,size_t)> UdpDispatcher;
 
 class UdpListener : public Ticking {
     void ensure_started() {
-        if (!udp) {
+        if (!udp_begun) {
             udp.begin(port);
+            udp_begun = true;
             _log.logf_ln("I [udp] UDP server listening on port %d", port);
         }
     }
 
     void ensure_stopped() {
-        if (udp) {
+        if (udp_begun) {
+            udp_begun = false;
             _log.logf_ln("W [udp] UDP server on port %d stopping", port);
             udp.stop();
         }
     }
 
     void receive_packet() {
+        if (!udp_begun) return;
+
         int packet_size = udp.parsePacket();
         if (packet_size) {
             if (packet_size > buffer_size) 
@@ -96,7 +102,7 @@ protected:
     Logger &_log;
 
     bool start = false;
-
+    bool udp_begun = false;
 };
 
 };

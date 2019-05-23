@@ -8,6 +8,8 @@
 #define NEOPIXELS 13
 #endif
 
+#define ZOSTAYIFY_PORT 10101
+
 #ifdef ARDUINO
 #include "secrets.h"
 
@@ -20,6 +22,7 @@
 #include <MC_Network.h>
 #include <MC_Panel.h>
 #include <MC_RTC.h>
+#include <MC_UDP.h>
 
 #ifdef NAMETAG
 #include <Adafruit_DotStarMatrix.h>
@@ -68,7 +71,7 @@ mysook::SimRTC rtc;
 mysook::SimLogger logger;
 #endif//ARDUINO
 
-ToddlerClock tclock(&logger, &panel, network, &rtc);
+ToddlerClock tclock(logger, &panel, network, &rtc, ZOSTAYIFY_PORT);
 
 void setup() {
 #ifdef ARDUINO
@@ -99,7 +102,7 @@ void setup() {
     }
     network.connect();
 
-    //mdns.add_service("http", "tcp", 80);
+	mdns.add_service("zostayify", "udp", ZOSTAYIFY_PORT);
 #else
     if (!al_init()) {
         std::cerr << "failed to initialize allegro" << std::endl;

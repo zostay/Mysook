@@ -2,13 +2,14 @@
 
 using namespace mysook;
 
-ToddlerClock::ToddlerClock(Logger *log, RGBPanel<LIGHT_WIDTH,LIGHT_HEIGHT> *panel, Network &network, RTC *rtc) 
-: Firmware(log), network(network) {
+ToddlerClock::ToddlerClock(Logger &log, RGBPanel<LIGHT_WIDTH,LIGHT_HEIGHT> *panel, Network &network, RTC *rtc, int zostayify_port) 
+: Firmware(log), network(network), zostayify(network, zostayify_port, dispatcher, log) {
     this->panel     = panel;
     this->rtc       = rtc;
 
     this->configger = new TClockConfig(log, network, config, rtc);
 
+    this->add_pre_ticker(&zostayify);
     this->add_pre_ticker(&network);
     this->add_pre_ticker(configger);
 }
@@ -84,6 +85,7 @@ ColorSetting ToddlerClock::make_transition_color(DateTime &now, ColorSetting &fr
 }
 
 void ToddlerClock::start() {
+    zostayify.begin();
     blank_screen();
 }
 
@@ -117,4 +119,8 @@ void ToddlerClock::tick() {
         logf_ln(" is night.");
         color_screen(now, config.night_color);
     }
+}
+
+void ToddlerClock::handle_zostayification(String remote_ip, uint16_t remote_port, const char *buf, size_t len) {
+    configger->ping();
 }
