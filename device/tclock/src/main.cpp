@@ -1,3 +1,5 @@
+#include <esp_system.h>
+
 #include "tclock_config.h"
 #include "tclock.h"
 
@@ -73,6 +75,15 @@ mysook::SimLogger logger;
 
 ToddlerClock tclock(logger, &panel, network, &rtc, ZOSTAYIFY_PORT);
 
+// Globals for Watchdog timer
+const int wdtTimeout = 5000;  //time in ms to trigger the watchdog
+hw_timer_t *timer = NULL;
+
+void IRAM_ATTR resetModule() {
+  ets_printf("reboot\n");
+  esp_restart();
+}
+
 void setup() {
 #ifdef ARDUINO
 #ifdef NAMETAG
@@ -121,9 +132,16 @@ void setup() {
 #endif//ARDUINO
 
     tclock.setup();
+
+    // Watchdog Timer to reboot on crash
+    timer = timerBegin(0, 80, true);                  //timer 0, div 80
+    timerAttachInterrupt(timer, &resetModule, true);  //attach callback
+    timerAlarmWrite(timer, wdtTimeout * 1000, false); //set time in us
+    timerAlarmEnable(timer);                          //enable interrupt
 }
 
 void loop() {
+    timerWrite(timer, 0); //reset timer (feed watchdog)
     tclock.loop();
 }
 
