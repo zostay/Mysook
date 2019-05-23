@@ -1,0 +1,60 @@
+#!/usr/bin/env perl6
+use v6;
+
+use JSON::Fast;
+
+use Smack::Client;
+use Smack::Client::Request::Common;
+
+my %*SUB-MAIN-OPTS = :named-anywhere;
+
+constant $API-URL = "https://api.zostay.com";
+constant $PING-HOST = "isaiah-clock.local";
+constant $ZOSTAYIFY-PORT = 10101;
+
+my $ua        = Smack::Client.new;
+my $zostayify = IO::Socket::Async.udp;
+
+my $api-url   = $API-URL;
+my $ping-host = $PING-HOST;
+
+sub set-globals($url, $ping) {
+    $api-url  = $url;
+    $ping-host = $ping;
+}
+
+sub api-url($path) { $api-url ~ $path }
+
+sub change-color(Str $which, Int $red, Int $green, Int $blue, Int $brightness) {
+    my $content = to-json(
+        %(
+            day-color => %(
+                :$red, :$green, :$blue, :$brightness,
+            ),
+        ),
+    );
+
+    my $req = PUT(api-url("/alarm/$which"), :$content, Content-Type => 'application/json; charset=utf-8');
+    my $res = await $ua.request($req);
+
+    unless ($res.code == 200) {
+        note "Bad stuff: $res.gist()";
+        exit 1;
+    }
+
+    $zostayify.print-to($ping-host, $ZOSTAYIFY-PORT, "GO");
+}
+
+multi MAIN('day-color', Int $red, Int $green, Int $blue, Int $brightness, Str :$url = $API-URL, Str :$ping = $PING-HOST) {
+    set-globals($url, $ping);
+    change-color('day-color', $red, $green, $blue, $brightness);
+}
+
+multi MAIN('random-color', Str :$url = $API-URL, Str :$ping = $PING-HOST) {
+    set-globals($url, $ping);
+
+    my @rgb;
+    repeat { @rgb = (^3).map({ (rand * 255).Int }); say @rgb } while ([+] @rgb) < 200;
+
+    change-color('day-color', |@rgb, 50);
+}
