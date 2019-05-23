@@ -68,7 +68,7 @@ mysook::SimRTC rtc;
 mysook::SimLogger logger;
 #endif//ARDUINO
 
-ToddlerClock tclock(&logger, &panel, &rtc);
+ToddlerClock tclock(&logger, &panel, network, &rtc);
 
 void setup() {
 #ifdef ARDUINO

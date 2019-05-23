@@ -6,6 +6,7 @@
 
 #include <Firmware.h>
 #include <Logger.h>
+#include <Network.h>
 #include <Panel.h>
 #include <RTC.h>
 
@@ -21,6 +22,7 @@ class ToddlerClock : public mysook::Firmware {
 private:
     TClockConfig *configger;
     mysook::RGBPanel<LIGHT_WIDTH, LIGHT_HEIGHT> *panel;
+    mysook::Network &network;
     mysook::RTC *rtc;
 
     ToddlerClockConfig config = {
@@ -41,7 +43,7 @@ private:
     ColorSetting make_transition_color(mysook::DateTime &now, ColorSetting &from, ColorSetting &to);
 
 public:
-    ToddlerClock(mysook::Logger *log, mysook::RGBPanel<LIGHT_WIDTH,LIGHT_HEIGHT> *panel, mysook::RTC *rtc);
+    ToddlerClock(mysook::Logger *log, mysook::RGBPanel<LIGHT_WIDTH,LIGHT_HEIGHT> *panel, mysook::Network &network, mysook::RTC *rtc);
     virtual ~ToddlerClock();
 
     virtual void start();

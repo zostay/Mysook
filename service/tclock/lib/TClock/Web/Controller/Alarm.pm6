@@ -76,10 +76,12 @@ method fetch($request) is action {
 
 multi method partial-enmesh(AlarmGroup $alarm, AlarmSegment $method, $config, Int $input) {
     $config."$alarm"()."$method"() = $input;
+    $config;
 }
 
 multi method partial-enmesh(ColorGroup $color, ColorSegment $method, $config, Int $input) {
     $config."$color"()."$method"() = $input;
+    $config;
 }
 
 multi method partial-enmesh($, $, $, $) {
@@ -87,11 +89,13 @@ multi method partial-enmesh($, $, $, $) {
 }
 
 multi method partial-enmesh(AlarmGroup $alarm, $config, %input) {
-    $config."$alarm"().enmesh(%input);
+    $config."$alarm"().enmesh(%input{$alarm});
+    $config;
 }
 
 multi method partial-enmesh(ColorGroup $color, $config, %input) {
-    $config."$color"().enmesh(%input);
+    $config."$color"().enmesh(%input{$color});
+    $config;
 }
 
 multi method partial-enmesh($, $, $) {

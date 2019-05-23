@@ -18,6 +18,7 @@ package GLOBAL::TClock::Model {
         method enmesh(%input) {
             $!hour   = %input<hour>   with %input<hour>;
             $!minute = %input<minute> with %input<minute>;
+            self;
         }
 
         method tuple() { ($!hour, $!minute) }
@@ -34,6 +35,7 @@ package GLOBAL::TClock::Model {
             $!green      = %input<green>      with %input<green>;
             $!blue       = %input<blue>       with %input<blue>;
             $!brightness = %input<brightness> with %input<brightness>;
+            self;
         }
 
         method tuple() { ($!red, $!green, $!blue, $!brightness) }
@@ -54,6 +56,7 @@ package GLOBAL::TClock::Model {
                 with %input<night-color>;
             $!day-color.enmesh(%input<day-color>)
                 with %input<day-color>;
+            self;
         }
     }
 }
