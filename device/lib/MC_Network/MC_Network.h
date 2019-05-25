@@ -9,7 +9,9 @@
 #ifdef ESP8266
 #include <ESP8266WiFi.h>
 
+#define SYSTEM_EVENT_STA_CONNECTED    WIFI_EVENT_STAMODE_CONNECTED
 #define SYSTEM_EVENT_STA_GOT_IP       WIFI_EVENT_STAMODE_GOT_IP
+#define SYSTEM_EVENT_STA_DHCP_TIMEOUT WIFI_EVENT_STAMODE_DHCP_TIMEOUT
 #define SYSTEM_EVENT_STA_DISCONNECTED WIFI_EVENT_STAMODE_DISCONNECTED
 #else//ESP8266
 #include <WiFi.h>
@@ -34,6 +36,11 @@ protected:
     WiFiAP memory[MAX_CONNECTION_MEMORY];
 	WiFiAP *current = 0;
 
+    WiFiEventHandler connected_handler;
+    WiFiEventHandler got_ip_handler;
+    WiFiEventHandler dhcp_timeout_handler;
+    WiFiEventHandler disconnected_handler;
+
     unsigned long timeout = 0;
     unsigned long last_announcement = 0;
 
@@ -54,9 +61,17 @@ protected:
 
     void handle_wifi_event(WiFiEvent_t event) {
         switch (event) {
+            case SYSTEM_EVENT_STA_CONNECTED:
+                logger.logf_ln("I [network] Connected %s", current->ssid);
+                break;
+
             case SYSTEM_EVENT_STA_GOT_IP:
                 connect_status = true;
-                logger.logf_ln("I [network] Connected %s; IP %s", current->ssid, WiFi.localIP().toString().c_str());
+                logger.logf_ln("I [network] IP assigned %s; IP %s", current->ssid, WiFi.localIP().toString().c_str());
+                break;
+
+            case SYSTEM_EVENT_STA_DHCP_TIMEOUT:
+                logger.logf_ln("W [network] DHCP timeout");
                 break;
 
             case SYSTEM_EVENT_STA_DISCONNECTED:
@@ -70,6 +85,10 @@ protected:
     }
 
     void find_connection() {
+        if (WiFi.status() == WL_CONNECTED) {
+            logger.logf_ln("E [network] Connected, but did not receive a notification");
+        }
+
         // nothing to do, we're connected
         if (connect_status) return;
 
@@ -148,25 +167,35 @@ protected:
     void begin_connection() {
         if (!current) return;
         
-        logger.logf_ln("I [network] Connecting to %s", current->ssid); 
-
         // Make sure we will be notified of a disconnect
 #ifdef ESP8266
-        if (listening) {
-            WiFi.onStationModeGotIP([this](const WiFiEventStationModeGotIP &) {
+        if (!listening) {
+            logger.logf_ln("D [network] Registering callbacks");
+            connected_handler = WiFi.onStationModeConnected([this](const WiFiEventStationModeConnected &) {
+                this->handle_wifi_event(SYSTEM_EVENT_STA_CONNECTED);
+            });
+            got_ip_handler = WiFi.onStationModeGotIP([this](const WiFiEventStationModeGotIP &) {
                 this->handle_wifi_event(SYSTEM_EVENT_STA_GOT_IP);
             });
-            WiFi.onStationModeDisconnected([this](const WiFiEventStationModeDisconnected &) {
+            dhcp_timeout_handler = WiFi.onStationModeDHCPTimeout([this](void) {
+                this->handle_wifi_event(SYSTEM_EVENT_STA_DHCP_TIMEOUT);
+            });
+            disconnected_handler = WiFi.onStationModeDisconnected([this](const WiFiEventStationModeDisconnected &) {
                 this->handle_wifi_event(SYSTEM_EVENT_STA_DISCONNECTED);
             });
+
+            listening = true;
         }
 #else//ESP8266
         if (!listener_id) {
+            logger.logf_ln("D [network] Registering callbacks");
             listener_id = WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info) {
                 this->handle_wifi_event(event);
             });
         }
 #endif//ESP8266
+
+        logger.logf_ln("I [network] Connecting to %s", current->ssid); 
 
         // Attempt to connect
         WiFi.begin(current->ssid, current->password);
