@@ -89,6 +89,22 @@ void ToddlerClock::start() {
     blank_screen();
 }
 
+bool ToddlerClock::is_daytime() {
+    DateTime now = rtc->now();
+
+    if (before_time(now, config.morning_time)) {
+        return false;
+    }
+
+    else if (before_transition_time(now, config.sleeping_time)) {
+        return true;
+    }
+
+    else {
+        return false;
+    }
+}
+
 void ToddlerClock::tick() {
     DateTime now = rtc->now();
 
@@ -121,6 +137,28 @@ void ToddlerClock::tick() {
     }
 }
 
+void ToddlerClock::go_crazy() {
+    DateTime now = rtc->now();
+
+    for (int i = 0; i < 50; i++) {
+        int r = random(256);
+        int g = random(256);
+        int b = random(256);
+
+        if (r + g + b > 200) {
+            color_screen(now, r, g, b, 100);
+        }
+
+        delay(50);
+    } 
+}
+
 void ToddlerClock::handle_zostayification(String remote_ip, uint16_t remote_port, const char *buf, size_t len) {
-    configger->ping();
+    if (len == 21 && is_daytime()) {
+        go_crazy();
+    }
+
+    else {
+        configger->ping();
+    }
 }

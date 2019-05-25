@@ -16,7 +16,7 @@
 #ifdef NAMETAG
 #define LIGHT_WIDTH 6
 #define LIGHT_HEIGHT 12
-#elif
+#else
 #define LIGHT_WIDTH 4
 #define LIGHT_HEIGHT 8
 #endif
@@ -41,7 +41,7 @@ private:
         .morning_time = { .h=7, .m=10 },
         .sleeping_time = { .h=19, .m=0 },
         .night_color = { .r=255u, .g=170u, .b=0u, .brightness=2u },
-        .day_color = { .r=0u, .g=80u, .b=255u, .brightness=40u }
+        .day_color = { .r=0u, .g=80u, .b=255u, .brightness=20u }
     };
 
     void blank_screen();
@@ -54,6 +54,8 @@ private:
     bool before_transition_time(mysook::DateTime &check, TimeSetting &against);
     ColorSetting make_transition_color(mysook::DateTime &now, ColorSetting &from, ColorSetting &to);
 
+    bool is_daytime();
+
 public:
     ToddlerClock(mysook::Logger &log, mysook::RGBPanel<LIGHT_WIDTH,LIGHT_HEIGHT> *panel, mysook::Network &network, mysook::RTC *rtc, int zostayify_port);
     virtual ~ToddlerClock();
@@ -64,6 +66,8 @@ public:
     virtual unsigned long tick_speed() { return 1000000ul; }
 
     void handle_zostayification(String remote_ip, uint16_t remote_port, const char *buf, size_t len);
+
+    void go_crazy();
 };
 
 #endif//__TCLOCK_H

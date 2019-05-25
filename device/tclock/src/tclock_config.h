@@ -4,9 +4,9 @@
 #include <ArduinoJson.h>
 #include <WiFiClient.h>
 
-#ifdef ESP8266
+#if defined(ESP8266)
 #include <ESP8266HTTPClient.h>
-#elif ESP32
+#elif defined(ESP32)
 #include <HTTPClient.h>
 #endif
 
@@ -17,11 +17,11 @@
 
 #include "config.h"
 
-#ifdef NAMETAG
+//#if defined(NAMETAG)
 #define URL_API       "http://192.168.205.116:5000" 
-#elif
-#define URI_API       "https://api.zostay.com"
-#endif
+//#else
+//#define URL_API       "https://api.zostay.com"
+//#endif
 
 #define URL_TIME      URL_API "/time"
 #define URL_ALARM     URL_API "/alarm"
@@ -72,7 +72,7 @@ public:
         ua.begin(String(URL_TIME));
         int code;
         if ((code = ua.GET()) <= 0) {
-            log.logf_ln("E [tclock_config] unable to fetch time from %s : (%d) %s", URL_TIME, code, ua.errorToString(code));
+            log.logf_ln("E [tclock_config] unable to fetch time from %s : (%d) %s", URL_TIME, code, ua.errorToString(code).c_str());
             return;
         }
 

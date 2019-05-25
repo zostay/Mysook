@@ -1,12 +1,14 @@
+#ifdef ESP32
 #include <esp_system.h>
+#endif
 
 #include "tclock_config.h"
 #include "tclock.h"
 
-#ifdef NAMETAG
+#if defined(NAMETAG)
 #define DATAPIN  27
 #define CLOCKPIN 13
-#elif
+#else
 #define NEOPIXELS 13
 #endif
 
@@ -26,7 +28,7 @@
 #include <MC_RTC.h>
 #include <MC_UDP.h>
 
-#ifdef NAMETAG
+#if defined(NAMETAG)
 #include <Adafruit_DotStarMatrix.h>
 
 typedef Adafruit_DotStarMatrix LightMatrix;
@@ -35,7 +37,7 @@ Adafruit_DotStarMatrix light = Adafruit_DotStarMatrix(
     DS_MATRIX_BOTTOM  + DS_MATRIX_LEFT +
     DS_MATRIX_COLUMNS + DS_MATRIX_PROGRESSIVE,
     DOTSTAR_BGR);
-#elif
+#else
 #include <Adafruit_NeoMatrix.h>
 #include <Adafruit_NeoPixel.h>
 
@@ -47,9 +49,9 @@ Adafruit_NeoMatrix light = Adafruit_NeoMatrix(
     NEO_GRB            + NEO_KHZ800);
 #endif
 
-#ifdef NAMETAG
+#if defined(NAMETAG)
 typedef RTC_Millis MyRTC;
-#elif
+#else
 typedef RTC_PCF8523 MyRTC;
 #endif
 
@@ -75,6 +77,7 @@ mysook::SimLogger logger;
 
 ToddlerClock tclock(logger, &panel, network, &rtc, ZOSTAYIFY_PORT);
 
+#ifdef ESP32
 // Globals for Watchdog timer
 const int wdtTimeout = 5000;  //time in ms to trigger the watchdog
 hw_timer_t *timer = NULL;
@@ -83,21 +86,22 @@ void IRAM_ATTR resetModule() {
   ets_printf("reboot\n");
   esp_restart();
 }
+#endif
 
 void setup() {
 #ifdef ARDUINO
-#ifdef NAMETAG
+#if defined(NAMETAG)
     pinMode(DATAPIN, OUTPUT);
     pinMode(CLOCKPIN, OUTPUT);
-#elif
+#else
     pinMode(NEOPIXELS, OUTPUT);
 #endif
 
     light.begin();
 
-#ifdef NAMETAG
+#if defined(NAMETAG)
     rtc_chip.begin(DateTime(F(__DATE__), F(__TIME__)));
-#elif
+#else
     rtc_chip.begin();
 
     //rtc_chip.adjust(DateTime(F(__DATE__), F(__TIME__)));
@@ -133,15 +137,19 @@ void setup() {
 
     tclock.setup();
 
+#ifdef ESP32
     // Watchdog Timer to reboot on crash
     timer = timerBegin(0, 80, true);                  //timer 0, div 80
     timerAttachInterrupt(timer, &resetModule, true);  //attach callback
     timerAlarmWrite(timer, wdtTimeout * 1000, false); //set time in us
     timerAlarmEnable(timer);                          //enable interrupt
+#endif
 }
 
 void loop() {
+#ifdef ESP32
     timerWrite(timer, 0); //reset timer (feed watchdog)
+#endif
     tclock.loop();
 }
 
