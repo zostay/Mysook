@@ -36,10 +36,12 @@ protected:
     WiFiAP memory[MAX_CONNECTION_MEMORY];
 	WiFiAP *current = 0;
 
+#ifdef ESP8266
     WiFiEventHandler connected_handler;
     WiFiEventHandler got_ip_handler;
     WiFiEventHandler dhcp_timeout_handler;
     WiFiEventHandler disconnected_handler;
+#endif//ESP8266
 
     unsigned long timeout = 0;
     unsigned long last_announcement = 0;
