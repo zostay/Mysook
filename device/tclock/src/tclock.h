@@ -41,7 +41,7 @@ private:
         .morning_time = { .h=7, .m=10 },
         .sleeping_time = { .h=19, .m=0 },
         .night_color = { .r=255u, .g=170u, .b=0u, .brightness=2u },
-        .day_color = { .r=0u, .g=80u, .b=255u, .brightness=20u }
+        .day_color = { .r=0u, .g=80u, .b=255u, .brightness=5u }
     };
 
     void blank_screen();
