@@ -72,9 +72,11 @@ protected:
                 logger.logf_ln("I [network] IP assigned %s; IP %s", current->ssid, WiFi.localIP().toString().c_str());
                 break;
 
+#ifdef ESP8266
             case SYSTEM_EVENT_STA_DHCP_TIMEOUT:
                 logger.logf_ln("W [network] DHCP timeout");
                 break;
+#endif//ESP8266
 
             case SYSTEM_EVENT_STA_DISCONNECTED:
                 connect_status = false;

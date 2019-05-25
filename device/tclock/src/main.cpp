@@ -77,9 +77,9 @@ mysook::SimLogger logger;
 
 ToddlerClock tclock(logger, &panel, network, &rtc, ZOSTAYIFY_PORT);
 
-#ifdef ESP32
 // Globals for Watchdog timer
 const int wdtTimeout = 5000;  //time in ms to trigger the watchdog
+#ifdef ESP32
 hw_timer_t *timer = NULL;
 
 void IRAM_ATTR resetModule() {
@@ -137,18 +137,22 @@ void setup() {
 
     tclock.setup();
 
-#ifdef ESP32
+#if defined(ESP32)
     // Watchdog Timer to reboot on crash
     timer = timerBegin(0, 80, true);                  //timer 0, div 80
     timerAttachInterrupt(timer, &resetModule, true);  //attach callback
     timerAlarmWrite(timer, wdtTimeout * 1000, false); //set time in us
     timerAlarmEnable(timer);                          //enable interrupt
+#elif defined(ESP8266)
+    wdt_enable(wdtTimeout);
 #endif
 }
 
 void loop() {
-#ifdef ESP32
+#if defined(ESP32)
     timerWrite(timer, 0); //reset timer (feed watchdog)
+#elif defined(ESP8266)
+    ESP.wdtFeed();
 #endif
     tclock.loop();
 }

@@ -1,7 +1,7 @@
 #ifndef __MC_UDP_H
 #define __MC_UDP_H
 
-#ifdef NOT_FUNCTIONAL
+#ifndef NOT_FUNCTIONAL
 #include <functional>
 #endif
 
