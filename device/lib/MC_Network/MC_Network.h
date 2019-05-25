@@ -85,10 +85,6 @@ protected:
     }
 
     void find_connection() {
-        if (WiFi.status() == WL_CONNECTED) {
-            logger.logf_ln("E [network] Connected, but did not receive a notification");
-        }
-
         // nothing to do, we're connected
         if (connect_status) return;
 
