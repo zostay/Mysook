@@ -28,7 +28,7 @@ sub api-url($path) { $api-url ~ $path }
 sub change-color(Str $which, Int $red, Int $green, Int $blue, Int $brightness) {
     my $content = to-json(
         %(
-            day-color => %(
+            $which => %(
                 :$red, :$green, :$blue, :$brightness,
             ),
         ),
@@ -48,6 +48,11 @@ sub change-color(Str $which, Int $red, Int $green, Int $blue, Int $brightness) {
 multi MAIN('day-color', Int $red, Int $green, Int $blue, Int $brightness, Str :$url = $API-URL, Str :$ping = $PING-HOST) {
     set-globals($url, $ping);
     change-color('day-color', $red, $green, $blue, $brightness);
+}
+
+multi MAIN('night-color', Int $red, Int $green, Int $blue, Int $brightness, Str :$url = $API-URL, Str :$ping = $PING-HOST) {
+    set-globals($url, $ping);
+    change-color('night-color', $red, $green, $blue, $brightness);
 }
 
 multi MAIN('random-color', Str :$url = $API-URL, Str :$ping = $PING-HOST) {
