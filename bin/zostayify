@@ -1,0 +1,28 @@
+#!/usr/bin/env perl
+
+use v5.28;
+
+use warnings;
+use strict;
+
+use Socket qw(:all);
+use POSIX ":sys_wait_h";
+
+my $msg = shift @ARGV // 'GO';
+
+my $zostayify_port = 10101;
+
+socket(my $udp, PF_INET, SOCK_DGRAM, getprotobyname("udp"))
+    or die "Error: can't create an udp socket: $!\n";
+
+my $orig = select($udp);
+$| = 1;
+select($orig);
+
+my $bc_addr = sockaddr_in($zostayify_port, INADDR_BROADCAST);
+setsockopt($udp, SOL_SOCKET, SO_BROADCAST, 1);
+
+send($udp, $msg, 0, $bc_addr)
+    or die "Error at sending: $!\n";
+
+close $udp;

@@ -8,24 +8,21 @@ use Smack::Client::Request::Common;
 
 my %*SUB-MAIN-OPTS = :named-anywhere;
 
-constant $API-URL = "https://api.zostay.com";
-constant $PING-HOST = "isaiah-clock.local";
-constant $ZOSTAYIFY-PORT = 10101;
+constant $API-URL   = "https://api.zostay.com";
+constant $ZOSTAYIFY = ~$*PROGRAM-NAME.IO.parent.add("zostayify");
 
 my $ua        = Smack::Client.new;
 my $zostayify = IO::Socket::Async.udp;
 
 my $api-url   = $API-URL;
-my $ping-host = $PING-HOST;
 
-sub set-globals($url, $ping) {
+sub set-globals($url) {
     $api-url  = $url;
-    $ping-host = $ping;
 }
 
 sub api-url($path) { $api-url ~ $path }
 
-sub change-color(Str $which, Int $red, Int $green, Int $blue, Int $brightness) {
+multi change-color(Str $which, Int $red, Int $green, Int $blue, Int $brightness) {
     my $content = to-json(
         %(
             $which => %(
@@ -42,21 +39,94 @@ sub change-color(Str $which, Int $red, Int $green, Int $blue, Int $brightness) {
         exit 1;
     }
 
-    $zostayify.print-to($ping-host, $ZOSTAYIFY-PORT, "GO");
+    run($ZOSTAYIFY);
 }
 
-multi MAIN('day-color', Int $red, Int $green, Int $blue, Int $brightness, Str :$url = $API-URL, Str :$ping = $PING-HOST) {
-    set-globals($url, $ping);
+multi change-color(Str $which, Str $rgb is copy, Int $brightness) {
+    $rgb .= substr(1) if $rgb.starts-with('#');
+
+    # split into 2-char pairs, then convert hex -> dec
+    my ($red, $green, $blue) = $rgb.comb(/../).map({ :16($_) });
+
+    change-color($which, $red, $green, $blue, $brightness);
+}
+
+sub change-time(Str $which, Str $time) {
+    my ($hour, $minute) = $time.split(':').map(*.Int);
+
+    my $content = to-json(
+        %(
+            $which => %(
+                :$hour, :$minute,
+            ),
+        ),
+    );
+
+    my $req = PUT(api-url("/alarm/$which"), :$content, Content-Type => 'application/json; charset=utf-8');
+    my $res = await $ua.request($req);
+
+    unless ($res.code == 200) {
+        note "Bad stuff: $res.gist()";
+        exit 1;
+    }
+
+    run($ZOSTAYIFY);
+}
+
+multi MAIN('show', Str :$url = $API-URL) {
+    $api-url = $url;
+
+    my $req = GET(api-url("/alarm"));
+    my $res = await $ua.request($req);
+
+    unless ($res.code == 200) {
+        note "Bad stuff: $res.gist()";
+        exit 1;
+    }
+
+    my %config = from-json($res.content);
+
+    my sub show-time($which) { sprintf("%02d:%02d", .<hour>, .<minute>) with %config{$which} }
+    my sub show-color($which) { sprintf("#%02x%02x%02x @ %d", .<red>, .<green>, .<blue>, .<brightness>) with %config{$which} }
+
+    say "Sleeping Time : {show-time('sleeping-time')}";
+    say "Morning Time  : {show-time('morning-time')}";
+    say "Night Color   : {show-color('night-color')}";
+    say "Day Color     : {show-color('day-color')}";
+}
+
+multi MAIN('morning-time', Str $time where /^\d\d':'\d\d$/, Str :$url = $API-URL) {
+    set-globals($url);
+    change-time('morning-time', $time);
+}
+
+multi MAIN('sleeping-time', Str $time where /^\d\d':'\d\d$/, Str :$url = $API-URL) {
+    set-globals($url);
+    change-time('sleeping-time', $time);
+}
+
+multi MAIN('day-color', Int $red, Int $green, Int $blue, Int $brightness, Str :$url = $API-URL) {
+    set-globals($url);
     change-color('day-color', $red, $green, $blue, $brightness);
 }
 
-multi MAIN('night-color', Int $red, Int $green, Int $blue, Int $brightness, Str :$url = $API-URL, Str :$ping = $PING-HOST) {
-    set-globals($url, $ping);
+multi MAIN('day-color', Str $rgb where /^ '#'? <xdigit> ** 6 $/, Int $brightness, Str :$url = $API-URL) {
+    set-globals($url);
+    change-color('day-color', $rgb, $brightness);
+}
+
+multi MAIN('night-color', Int $red, Int $green, Int $blue, Int $brightness, Str :$url = $API-URL) {
+    set-globals($url);
     change-color('night-color', $red, $green, $blue, $brightness);
 }
 
-multi MAIN('random-color', Str :$url = $API-URL, Str :$ping = $PING-HOST) {
-    set-globals($url, $ping);
+multi MAIN('night-color', Str $rgb where /^ '#'? <xdigit> ** 6 $/, Int $brightness, Str :$url = $API-URL) {
+    set-globals($url);
+    change-color('night-color', $rgb, $brightness);
+}
+
+multi MAIN('random-color', Str :$url = $API-URL) {
+    set-globals($url);
 
     my @rgb;
     repeat { @rgb = (^3).map({ (rand * 255).Int }); say @rgb } while ([+] @rgb) < 200;
