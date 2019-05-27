@@ -79,12 +79,22 @@ ToddlerClock tclock(logger, &panel, network, &rtc, ZOSTAYIFY_PORT);
 
 // Globals for Watchdog timer
 const int wdtTimeout = 5000;  //time in ms to trigger the watchdog
-#ifdef ESP32
+#if defined(ESP32)
 hw_timer_t *timer = NULL;
 
 void IRAM_ATTR resetModule() {
-  ets_printf("reboot\n");
-  esp_restart();
+    ets_printf("reboot\n");
+    esp_restart();
+}
+#elif defined(ESP8266)
+#include <Ticker.h>
+
+Ticker lwdTicker;
+unsigned lwdTime = 0;
+void ICACHE_RAM_ATTR lwdtISR() {
+    if (millis() - lwdTime > wdtTimeout) {
+        ESP.restart();  
+    }
 }
 #endif
 
@@ -137,22 +147,24 @@ void setup() {
 
     tclock.setup();
 
-#if defined(ESP32)
     // Watchdog Timer to reboot on crash
+#if defined(ESP32)
     timer = timerBegin(0, 80, true);                  //timer 0, div 80
     timerAttachInterrupt(timer, &resetModule, true);  //attach callback
     timerAlarmWrite(timer, wdtTimeout * 1000, false); //set time in us
     timerAlarmEnable(timer);                          //enable interrupt
 #elif defined(ESP8266)
-    wdt_enable(wdtTimeout);
+    lwdTime = millis();
+    lwdTicker.attach_ms(wdtTimeout, lwdtISR);
 #endif
 }
 
 void loop() {
+    // Feed watchdog
 #if defined(ESP32)
     timerWrite(timer, 0); //reset timer (feed watchdog)
 #elif defined(ESP8266)
-    ESP.wdtFeed();
+    lwdTime = millis();
 #endif
     tclock.loop();
 }
