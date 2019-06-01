@@ -3,6 +3,8 @@
 
 #include <Arduino.h>
 
+#include <Network.h>
+
 namespace mysook {
 
 class LED {
@@ -58,9 +60,9 @@ public:
         }
     }
 
-    void set_blink_mode(int mode) { 
+    void set_blink_mode(int mode, bool trigger_tick = true) { 
         blink_mode = mode; 
-        tick();
+        if (trigger_tick) tick();
     }
 
     int get_blink_mode() { return blink_mode; }
@@ -69,6 +71,33 @@ private:
     int i = 0;
     int speed = 1000000;
     int blink_mode = BLINK_OFF;
+};
+
+class WiFiLED : public BlinkyLED {
+public:
+    WiFiLED(int pin, mysook::Network &network) : BlinkyLED(pin), network(network) { }
+
+    virtual void tick() {
+        if (!was_connected && network.connected()) {
+             set_blink_mode(BLINK_ON, false);
+        }
+        else if (!was_connecting && network.connecting()) {
+             set_blink_mode(BLINK_BLINK, false);
+        }
+        else if (was_connected && !network.connected()
+             || was_connecting && !network.connecting()) {
+
+             set_blink_mode(BLINK_OFF, false);
+        }
+
+        BlinkyLED::tick();
+    }
+
+private:
+    mysook::Network &network;
+
+    bool was_connecting = false;
+    bool was_connected = false;
 };
 
 };
