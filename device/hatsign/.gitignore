@@ -1,0 +1,7 @@
+.pioenvs
+.piolibdeps
+
+src/secrets.h
+
+*.o
+sim-nametag
