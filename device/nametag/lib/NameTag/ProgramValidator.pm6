@@ -3,8 +3,9 @@ use v6;
 unit module NameTag::ProgramValidator;
 
 class GLOBAL::X::NameTag::ProgramValidator is Exception {
+    has Int $.pp;
     has Str $.message;
-    only method new(Str $message) { self.bless: :$message }
+    only method new(Int $pp, Str $message) { self.bless: :$pp, :$message }
     method Str() { $!message }
 }
 
