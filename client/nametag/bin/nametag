@@ -1,0 +1,101 @@
+#!/usr/bin/env perl6
+use v6;
+
+use Base64;
+use JSON::Fast;
+use Smack::Client;
+use Smack::Client::Request::Common;
+
+my %*SUB-MAIN-OPTS = :named-anywhere;
+
+constant $API-URL   = "https://nametag.zostay.com";
+constant $ZOSTAYIFY = ~$*PROGRAM-NAME.IO.parent.add("zostayify");
+
+my $ua       = Smack::Client.new;
+my $api-url  = $API-URL;
+
+sub set-globals($url) {
+    $api-url = $url;
+}
+
+sub api-url($path) { $api-url ~ $path }
+
+sub get-program($program) {
+    use NameTag;
+    use NameTag::ProgramBuilder;
+    EVALFILE $program;
+}
+
+sub upload-program($name, $author, $program-bin) {
+    my $program = encode-base64($program-bin.bytes, :str);
+    my $content = to-json(%( :$name, :$author, :$program ));
+
+    dd $content;
+
+    my $req = POST(api-url("/program"), :$content, Content-Type => 'application/json; charset=utf-8');
+    my $res = await $ua.request($req);
+
+    unless ($res.code == 200 || $res.code == 201) {
+        note "Bad stuff: $res.gist()";
+        note $res.content;
+        exit 1;
+    }
+
+    my $created = from-json($res.content);
+    say "ID: $created<id>";
+}
+
+sub dump-cpp($program) {
+    my @str = $program.program-ops.join(", ");
+    while @str[*-1].chars > 74 {
+        my $split = pop @str;
+
+        my $i = $split.rindex(' ', 78);
+        my $x = $split.substr(0..^$i);
+        my $y = $split.substr($i^..*);
+        @str.append: $x, $y;
+    }
+
+    say q:to/END_PREAMBLE/;
+    #include <inttypes.h>
+    #include "ops.h"
+    END_PREAMBLE
+
+    for $program.codex.call-index.kv -> $name, $index {
+        say "#define $name.uc.subst(/\W/, "_", :g) $index";
+    }
+
+    say '';
+    say 'uint32_t program[] = {';
+    say @str.join("\n").indent(4);
+    say '};';
+}
+
+sub dump-bin($program) {
+    for @($program.bytes) { .chr.print }
+}
+
+multi MAIN('dump', Str $program-file, Bool :$cpp, Bool :$bin) {
+    my $program = get-program($program-file);
+
+    if ($bin && !$cpp) {
+        dump-cpp($program);
+    }
+    elsif ($cpp && !$bin) {
+        dump-bin($program);
+    }
+    else {
+        note "Please specify either --cpp or --bin";
+    }
+}
+
+subset NonEmptyStr of Str where /\w/;
+subset AuthorName of Str where /^ (github|https?|cpan) ':' '//'? \w ** 3/;
+
+multi MAIN('upload', Str $program-file, NonEmptyStr :$name!, AuthorName :$author!, Str :$url = $API-URL) {
+    set-globals($url);
+
+    my $program = get-program($program-file);
+
+    upload-program($name, $author, $program);
+}

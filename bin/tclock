@@ -12,7 +12,6 @@ constant $API-URL   = "https://api.zostay.com";
 constant $ZOSTAYIFY = ~$*PROGRAM-NAME.IO.parent.add("zostayify");
 
 my $ua        = Smack::Client.new;
-my $zostayify = IO::Socket::Async.udp;
 
 my $api-url   = $API-URL;
 

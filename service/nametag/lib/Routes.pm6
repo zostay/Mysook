@@ -69,6 +69,7 @@ class RateLimiter does Cro::HTTP::Middleware::Request {
 class X::ValidationFail is Exception {
     has $.field;
     has $.message;
+    multi method new($field, $message) { self.bless(:$field, :$message) }
     method Str() { "$!field: $!message" }
 }
 
@@ -82,16 +83,16 @@ sub routes() is export {
         # Upload a program
         post -> 'program' {
             request-body -> %program {
-                %program<name> ~~ /\w+/
-                    or die X::ValidationFail("name", "You must give your program a name.");
+                %program<name>.defined && %program<name> ~~ /\w+/
+                    or die X::ValidationFail.new("name", "You must give your program a name.");
                 my $name = %program<name>.trim;
 
-                %program<author> ~~ /^[github|cpan|http|https]:\S+/
-                    or die X::ValidationFail("author", "You must give a URL claiming authorship, e.g., github:zostay, cpan:HANENKAMP, or https://sterling.hanenkamp.com/");
+                %program<author>.defined && %program<author> ~~ /^[github|cpan|http|https]:\S+/
+                    or die X::ValidationFail.new("author", "You must give a URL claiming authorship, e.g., github:zostay, cpan:HANENKAMP, or https://sterling.hanenkamp.com/");
                 my $author = %program<author>.trim;
 
-                %program<program> ~~ m{^<[a..zA..Z+/]> ** 22..87382 $}
-                    or die X::ValidationFail("program", "You must provide the program as a BASE-64 encoded string.");
+                %program<program>.defined && %program<program> ~~ m{^<[a..zA..Z0..9+/]> ** 22..87382 '='* $}
+                    or die X::ValidationFail.new("program", "You must provide the program as a BASE-64 encoded string.");
                 my $b64-program = %program<program>;
                 my $bin-program = decode-base64($b64-program, :bin);
 
