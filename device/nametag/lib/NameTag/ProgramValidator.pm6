@@ -1,5 +1,6 @@
-unit module NameTag::ProgramValidator;
 use v6;
+
+unit module NameTag::ProgramValidator;
 
 class GLOBAL::X::NameTag::ProgramValidator is Exception {
     has Str $.message;

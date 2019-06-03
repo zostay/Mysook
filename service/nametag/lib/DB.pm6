@@ -1,5 +1,6 @@
-unit class DB;
 use v6;
+
+unit class DB;
 
 use DBIish;
 
