@@ -19,7 +19,7 @@ sub validate-program(Blob $d) is export {
     while ($pp < $d.elems) {
         my $op = VMOp($d[$pp]);
 
-        die X::NameTag::ProgramValidator.new($pp, "invalid opcode [$op]")
+        die X::NameTag::ProgramValidator.new($pp, "invalid opcode [{$op//'-'}]")
             unless $op;
 
         if $op == OP_SUB {

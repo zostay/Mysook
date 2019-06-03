@@ -30,8 +30,6 @@ sub upload-program($name, $author, $program-bin) {
     my $program = encode-base64($program-bin.bytes, :str);
     my $content = to-json(%( :$name, :$author, :$program ));
 
-    dd $content;
-
     my $req = POST(api-url("/program"), :$content, Content-Type => 'application/json; charset=utf-8');
     my $res = await $ua.request($req);
 
