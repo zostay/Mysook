@@ -7,7 +7,7 @@ class GLOBAL::X::NameTag::ProgramValidator is Exception {
     has Str $.cause;
     only method new(Int $pp, Str $cause) { self.bless: :$pp, :$cause }
     method message() { ~self }
-    method Str() { "PP$!pp: $!message" }
+    method Str() { "PP$!pp: $!cause" }
 }
 
 use NameTag;
