@@ -4,9 +4,10 @@ unit module NameTag::ProgramValidator;
 
 class GLOBAL::X::NameTag::ProgramValidator is Exception {
     has Int $.pp;
-    has Str $.message;
-    only method new(Int $pp, Str $message) { self.bless: :$pp, :$message }
-    method Str() { $!message }
+    has Str $.cause;
+    only method new(Int $pp, Str $cause) { self.bless: :$pp, :$cause }
+    method message() { ~self }
+    method Str() { "PP$!pp: $!message" }
 }
 
 use NameTag;
@@ -20,7 +21,7 @@ sub validate-program(Blob $d) is export {
     while ($pp < $d.elems) {
         my $op = VMOp($d[$pp]);
 
-        die X::NameTag::ProgramValidator.new($pp, "invalid opcode [{$op//'-'}]")
+        die X::NameTag::ProgramValidator.new($pp, "invalid opcode #$d[$pp] [{$op//'-'}]")
             unless $op;
 
         if $op == OP_SUB {
