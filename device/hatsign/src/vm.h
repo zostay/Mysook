@@ -24,7 +24,7 @@
 #define PANEL_WIDTH 12
 #define PANEL_HEIGHT 6
 
-#define MAX_BRIGHTNESS 75
+#define MAX_BRIGHTNESS 30
 
 template <int W, int H>
 void op_mask_columns(VM<W,H> &);

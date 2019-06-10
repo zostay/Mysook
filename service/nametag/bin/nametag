@@ -2,70 +2,130 @@
 use v6;
 
 use Base64;
-use Cro::HTTP::Client;
-use Cro::Uri;
+use JSON::Fast;
+use Smack::Client;
+use Smack::Client::Request::Common;
 
 my %*SUB-MAIN-OPTS = :named-anywhere;
-my $base-uri-str = %*ENV<NAMETAG_URI> // 'https://nametag.zostay.com';
 
-my $base-uri = Cro::Uri.parse($base-uri-str);
-my $ua       = Cro::HTTP::Client.new(:$base-uri);
+constant $API-URL   = "https://nametag.zostay.com";
+constant $ZOSTAYIFY = ~$*PROGRAM-NAME.IO.parent.add("zostayify");
 
-multi MAIN('program', 'list') {
-    my $res = await $ua.get("program");
+my $ua       = Smack::Client.new;
+my $api-url  = $API-URL;
 
-    my %length;
-    if $res.status == 200 {
-        my $info     = await $res.body;
-        my @programs = @($info<programs>);
+sub set-globals($url) {
+    $api-url = $url;
+}
 
-        %length<name>   = [max] 1, |@programs.map(*.<name>);
-        %length<author> = [max] 1, |@programs.map(*.<author>);
+sub api-url($path) { $api-url ~ $path }
 
-        printf "%-%length<name>s %-%length<author>s\n", .<name>, .<author>
-            for %(name=>'Name',author=>'Author'), |@programs;
+sub get-program($program) {
+    use NameTag;
+    use NameTag::ProgramBuilder;
+    EVALFILE $program;
+}
+
+sub list-programs() {
+    my $req = GET(api-url("/program"));
+    my $res = await $ua.request($req);
+
+    unless $res.code == 200 {
+        note "Bad stuff: $res.gist()";
+        note $res.content;
+        exit 1;
+    }
+
+    my $programs = from-json($res.content);
+    $programs<programs>;
+}
+
+sub upload-program($name, $author, $program-bin) {
+    my $program = encode-base64($program-bin.bytes, :str);
+    my $content = to-json(%( :$name, :$author, :$program ));
+
+    my $req = POST(api-url("/program"), :$content, Content-Type => 'application/json; charset=utf-8');
+    my $res = await $ua.request($req);
+
+    unless $res.code == 200 || $res.code == 201 {
+        note "Bad stuff: $res.gist()";
+        note $res.content;
+        exit 1;
+    }
+
+    my $created = from-json($res.content);
+    say "ID: $created<id>";
+}
+
+sub dump-cpp($program) {
+    my @str = $program.program-ops.join(", ");
+    while @str[*-1].chars > 74 {
+        my $split = pop @str;
+
+        my $i = $split.rindex(' ', 74);
+        my $x = $split.substr(0..^$i);
+        my $y = $split.substr($i^..*);
+        @str.append: $x, $y;
+    }
+
+    say q:to/END_PREAMBLE/;
+    #include <inttypes.h>
+    #include "ops.h"
+    END_PREAMBLE
+
+    for $program.codex.call-index.kv -> $name, $index {
+        say "#define $name.uc.subst(/\W/, "_", :g) $index";
+    }
+
+    say '';
+    say 'uint32_t program[] = {';
+    say @str.join("\n").indent(4);
+    say '};';
+}
+
+sub dump-bin($program) {
+    for @($program.bytes) { .chr.print }
+}
+
+multi MAIN('dump', Str $program-file, Bool :$cpp, Bool :$bin) {
+    my $program = get-program($program-file);
+
+    if ($cpp && !$bin) {
+        dump-cpp($program);
+    }
+    elsif ($bin && !$cpp) {
+        dump-bin($program);
     }
     else {
-        note "UNKNOWN ERROR: {await $res.body()}";
+        note "Please specify either --cpp or --bin";
     }
 }
 
-multi MAIN('program', 'add', :$name!, :$author!, :$program!) {
-    my $p6-program = do given $program {
-        when '-' { $*IN.slurp }
-        default  { .IO.slurp }
-    }
+multi MAIN('list', Str :$url = $API-URL) {
+    set-globals($url);
 
-    my $blob-program = do {
-        use MONKEY-SEE-NO-EVAL;
-        use NameTag;
-        use NameTag::ProgramBuilder;
-        $p6-program.EVAL;
+    my @programs := list-programs();
+    for @programs -> $program {
+        say "$program<id>: $program<name>";
     }
+    say "No programs." unless @programs;
+}
 
-    my $res = await $ua.post("program",
-        content-type => 'application/json',
-    );
-    #     body => %(
-    #         name => $name,
-    #         author => $author,
-    #         program => $blob-program.bytes,
-    #     ),
-    # );
+subset ProgramName of Str where /\w ** 3/;
+subset AuthorName of Str where /^ (github|https?|cpan) ':' '//'? \w ** 3/;
 
-    CATCH {
-        when X::Cro::HTTP::Error {
-            note .response.Str;
-        }
-    }
+multi MAIN('upload', Str $program-file, ProgramName :$name!, AuthorName :$author!, Str :$url = $API-URL) {
+    set-globals($url);
 
-    if $res.status == 200 {
-        my $created = await $res.body;
-        say "Program $created<id>";
-    }
-    else {
-        my $error = await $res.body;
-        note "$error<field>: $error<message>"
-            if $error ~~ Hash && ($error<field> && $error<message>);
-    }
+    my $program = get-program($program-file);
+
+    upload-program($name, $author, $program);
+}
+
+multi MAIN('generate-keys') {
+    use Crypt::RSA;
+    my $crypt = Crypt::RSA.new;
+    my ($public, $private) = $crypt.generate-keys;
+    say "PUBLIC:  $public.exponent():$public.modulus()";
+    say "PRIVATE: $private.exponent():$private.modulus()";
 }

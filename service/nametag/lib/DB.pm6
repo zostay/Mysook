@@ -8,12 +8,18 @@ has $!host     = %*ENV<DB_HOST>;
 has $!user     = %*ENV<DB_USER>;
 has $!password = %*ENV<DB_PASSWORD>;
 has $!port     = %*ENV<DB_PORT>;
+has $!socket   = %*ENV<DB_SOCKET>;
 has $!database = %*ENV<DB_DATABASE>;
 
 has $.dbh;
 
 method connect() {
-    $!dbh = DBIish.connect('mysql', :$!database, :$!host, :$!port, :$!user, :$!password, :RaiseError);
+    if $!socket {
+        $!dbh = DBIish.connect('mysql', :$!database, :$!host, :$!socket, :$!user, :$!password, :RaiseError);
+    }
+    else {
+        $!dbh = DBIish.connect('mysql', :$!database, :$!host, :$!port, :$!user, :$!password, :RaiseError);
+    }
 }
 
 method txn(&code) {

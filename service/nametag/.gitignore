@@ -4,3 +4,7 @@ node_modules/
 
 # Backup files
 *~
+
+# My device keys
+private.key
+public.key
