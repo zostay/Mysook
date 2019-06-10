@@ -364,7 +364,7 @@ class NameTag::ProgramBuilder {
         }
     }
 
-    method bytes() {
+    method buf8(--> buf8) {
         my @bytes;
         for flat $!start, @!program -> $dword {
             @bytes.append: (
@@ -376,6 +376,10 @@ class NameTag::ProgramBuilder {
         }
 
         buf8.new(@bytes);
+    }
+
+    method buf32(--> buf32) {
+        buf32.new: flat $!start, @!program;
     }
 
     method program-ops() { |@!program, OP_HALT, OP_HALT }

@@ -12,7 +12,13 @@ class GLOBAL::X::NameTag::ProgramValidator is Exception {
 
 use NameTag;
 
-sub validate-program(Blob $d) is export {
+sub validate-program(Blob $bin8-program) is export {
+    my $d = buf32.new: $bin8-program.map(
+        -> $a, $b, $c, $d {
+            [+|] ($a +< 0x18, $b +< 0x10, $c +< 0x08, $d).map(* % 0x100)
+        }
+    );
+
     my $start = $d[0];
 
     my UInt %codex{Int};
@@ -26,7 +32,7 @@ sub validate-program(Blob $d) is export {
 
         if $op == OP_SUB {
             die X::NameTag::ProgramValidator.new($pp, "reused function index $d[$op+1]")
-                if %codex{ $d[$op+1] } :exists;
+                if %codex{ $d[$pp+1] } :exists;
             %codex{ $d[$op+1] } = $pp;
         }
 

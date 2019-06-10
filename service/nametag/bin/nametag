@@ -41,7 +41,7 @@ sub list-programs() {
 }
 
 sub upload-program($name, $author, $program-bin) {
-    my $program = encode-base64($program-bin.bytes, :str);
+    my $program = encode-base64($program-bin.buf8, :str);
     my $content = to-json(%( :$name, :$author, :$program ));
 
     my $req = POST(api-url("/program"), :$content, Content-Type => 'application/json; charset=utf-8');
@@ -84,7 +84,7 @@ sub dump-cpp($program) {
 }
 
 sub dump-bin($program) {
-    for @($program.bytes) { .chr.print }
+    for @($program.buf8) { .chr.print }
 }
 
 multi MAIN('dump', Str $program-file, Bool :$cpp, Bool :$bin) {
@@ -106,7 +106,7 @@ multi MAIN('list', Str :$url = $API-URL) {
 
     my @programs := list-programs();
     for @programs -> $program {
-        say "$program<id>: $program<name>";
+        say "$program<id>: $program<name> ($program<author>)";
     }
     say "No programs." unless @programs;
 }

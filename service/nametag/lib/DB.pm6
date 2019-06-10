@@ -39,7 +39,7 @@ method txn(&code) {
         $result = code($!dbh);
 
         CATCH {
-            when (X::DBDish::DBerror) {
+            when (X::DBDish::DBError) {
                 .throw if $retried++;
                 redo;
             }
@@ -105,7 +105,9 @@ method save-program(Str $name, Str $author, Blob $descriptor) {
         ]);
         $sth.execute($name, $author, $descriptor);
 
-        self.enqueue($sth.insert-id);
+        self.enqueue-program($sth.insert-id);
+
+        $sth.insert-id;
     }
 }
 
@@ -113,6 +115,7 @@ method list-programs() {
     my $sth = $!dbh.prepare(qq[
         SELECT id, name, author FROM program_v1 ORDER BY id DESC;
     ]);
+    $sth.execute;
     $sth.allrows(:array-of-hash);
 }
 
@@ -123,6 +126,8 @@ method enqueue-program(Int $id) {
             VALUES (?)
         ]);
         $sth.execute($id);
+
+        $sth.insert-id
     }
 }
 

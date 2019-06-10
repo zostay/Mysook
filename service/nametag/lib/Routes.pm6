@@ -117,6 +117,7 @@ sub routes() is export {
                 CATCH {
                     when X::ValidationFail {
                         bad-request 'application/json', %(
+                            error   => True,
                             field   => .field,
                             message => .message,
                         );
@@ -141,9 +142,8 @@ sub routes() is export {
 
         # List all programs
         get -> 'program' {
-            content 'application/json', %(
-                programs => $db.list-programs,
-            );
+            my @programs = $db.list-programs;
+            content 'application/json', %(:@programs);
         }
 
         # Get a program
