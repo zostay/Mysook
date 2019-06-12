@@ -3,44 +3,40 @@ use v6;
 use Base64;
 use Cro::HTTP::Middleware;
 use Cro::HTTP::Router;
-use Crypt::RSA;
 
 use DB;
+use NameTag;
 use NameTag::ProgramValidator;
 
-class NameTagID does Cro::HTTP::Auth { }
+subset AutoID of UInt where * > 0;
+subset ProgramName of Str where /^ <[- _ a..z A..Z 0..9 .]> ** 3..* $/;
+subset QueueName of Str where /^ <[- _ a..z A..Z 0..9 .]> ** 3..* $/;
+subset AdminToken of Str where /^ <[ a..z A..Z 0..9 ]> ** 40 $/;
 
-class NameTagAuth does Cro::HTTP::Middleware::Request {
-    has $.db;
-    has $.rsa;
-    has $.credentials;
+class LoggedAdmin does Cro::HTTP::Auth { }
+
+class AdminAuth does Cro::HTTP::Middleware::Request {
+    has $.admin-token;
 
     submethod TWEAK {
-        die "missing DEVICE_KEY" without %*ENV<DEVICE_KEY>;
-        die "device key must be formatted as EXPONENT:MODULUS"
-            unless %*ENV<DEVICE_KEY>.Str ~~ /^\d+ ':' \d+/;
+        die "missing ADMIN_TOKEN" without %*ENV<ADMIN_TOKEN>;
+        die "ADMIN_TOKEN must be formatted as 40 letters and numbers"
+            unless %*ENV<ADMIN_TOKEN>.Str ~~ AdminToken;
 
-        my $public-key = Crypt::RSA::Key.new(
-            exponent => %*ENV<DEVICE_KEY>.Str.split(":", 2)[0].Int,
-            modulus  => %*ENV<DEVICE_KEY>.Str.split(":", 2)[1].Int,
-        );
 
-        $!rsa = Crypt::RSA.new(:$public-key);
+        $!admin-token = %*ENV<ADMIN_TOKEN>.Str;
     }
 
     method process(Supply $requests --> Supply) {
+        # I trust anyone who has a private key matching the server's
+        # public key... because that should only be me. :)
         supply whenever $requests -> $req {
             my $auth = Nil;
-            with $req.header('Authorization') -> $auth {
-                my ($type, $credentials) = $auth.split(' ', 2);
+            with $req.header('Authorization') -> $auth-header {
+                my ($type, $credentials) = $auth-header.split(' ', 2);
 
-                if ($type.lc eq 'signature') {
-                    my ($message, $signature) = $credentials.split(':', 2);
-                    my ($plain) = $!rsa.encrypt($signature);
-                    my ($nonce, $sig-message) = split(':', 2);
-                    if $!db.check-nonce && $message eq $sig-message {
-                        $auth = NameTagID.new;
-                    }
+                if $type.lc eq 'bearer' {
+                    $auth = LoggedAdmin.new if $credentials eq $!admin-token;
                 }
             }
 
@@ -78,10 +74,11 @@ sub routes() is export {
     $db.create-schema;
 
     my $rate-limited-routes = route {
+        before AdminAuth.new(:$db);
         before RateLimiter.new(:$db);
 
         # Upload a program
-        post -> 'program' {
+        post -> LoggedAdmin, 'program' {
             request-body -> %program {
                 %program<name>.defined && %program<name> ~~ /\w+/
                     or die X::ValidationFail.new("name", "You must give your program a name.");
@@ -127,14 +124,37 @@ sub routes() is export {
         }
 
         # Enqueue a program
-        post -> 'queue', UInt $id where * > 0 {
-            my %program = $db.load-program($id);
-            with %program<id> {
-                $db.enqueue-program($id);
+        post -> 'queue', QueueName $name {
+            if request.auth ~~ LoggedAdmin {
+                request-body -> %program-info (AutoID :$id) {
+                    my %program = $db.load-program($id);
+                    with %program<id> {
+                        $db.enqueue-program($name, $id);
+
+                        content 'application/json', %;
+                    }
+                    else {
+                        bad-request 'application/json', %(
+                            error   => True,
+                            field   => 'id',
+                            message => 'You must name the program ID to enqueue.',
+                        );
+                    }
+                }
             }
             else {
-                not-found, 'application/json', %;
+                response.status = 401;
+                content 'application/json', %(
+                    error   => True,
+                    message => 'unauthorized',
+                );
             }
+        }
+
+        # List programs in a queue
+        get -> 'queue', QueueName $name {
+            my @programs = $db.list-queue($name);
+            content 'application/json', %(:@programs);
         }
     }
 
@@ -147,7 +167,7 @@ sub routes() is export {
         }
 
         # Get a program
-        get -> 'program', UInt $id where * > 0 {
+        get -> 'program', AutoID $id {
             my %program = $db.load-program($id);
             if %program {
                 content 'application/json', %(
@@ -165,10 +185,10 @@ sub routes() is export {
 
 
     my $nametag-routes = route {
-        before NameTagAuth.new(:$db);
+        before AdminAuth.new(:$db);
 
         # Dequeue a program
-        post -> NameTagID $tag, 'next-program' {
+        post -> LoggedAdmin, 'next-program' {
             content 'application/octet', $db.dequeue-program;
         }
     }

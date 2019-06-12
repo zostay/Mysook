@@ -65,17 +65,27 @@ method create-schema() {
     ]);
 
     $!dbh.do(qq[
-        CREATE TABLE IF NOT EXISTS queue_v1(
+        CREATE TABLE IF NOT EXISTS queue_v2(
+            id INT NOT NULL AUTO_INCREMENT,
+            name VARCHAR(20) NOT NULL,
+            PRIMARY KEY (id),
+            UNIQUE (name)
+        )
+    ]);
+
+    $!dbh.do(qq[
+        CREATE TABLE IF NOT EXISTS queue_program_v1(
             id INT NOT NULL AUTO_INCREMENT,
             program_id INT NOT NULL,
+            queue_id INT NOT NULL,
             dequeued INT(1) NOT NULL DEFAULT 0,
             PRIMARY KEY (id)
         )
     ]);
 
     $!dbh.do(qq[
-        CREATE TABLE IF NOT EXISTS nonce_v1(
-            nonce INT NOT NULL,
+        CREATE TABLE IF NOT EXISTS nonce_v2(
+            nonce VARCHAR(10) NOT NULL,
             PRIMARY KEY (nonce)
         )
     ]);
@@ -105,7 +115,7 @@ method save-program(Str $name, Str $author, Blob $descriptor) {
         ]);
         $sth.execute($name, $author, $descriptor);
 
-        self.enqueue-program($sth.insert-id);
+        #self.enqueue-program($sth.insert-id);
 
         $sth.insert-id;
     }
@@ -119,15 +129,47 @@ method list-programs() {
     $sth.allrows(:array-of-hash);
 }
 
-method enqueue-program(Int $id) {
-    self.txn: {
-        my $sth = $!dbh.prepare(qq[
-            INSERT INTO queue_v1(program_id)
-            VALUES (?)
-        ]);
-        $sth.execute($id);
+method list-queue(Str $name) {
+    my $sth = $!dbh.prepare(qq[
+        SELECT p.id, p.name, p.author
+          FROM program_v1 p
+    INNER JOIN queue_program_v1 qp ON (p.id = qp.program_id)
+    INNER JOIN queue_v2 q ON (q.id = qp.queue_id)
+         WHERE q.name = ?
+    ]);
+    $sth.execute($name);
+    $sth.allrows(:array-of-hash);
+}
 
-        $sth.insert-id
+method enqueue-program(Str $name, Int $id --> Nil) {
+    self.txn: {
+        {
+            my $sth = $!dbh.prepare(qq[
+                INSERT IGNORE INTO queue_v2(name)
+                VALUES (?)
+            ]);
+            $sth.execute($name);
+        }
+
+        my $queue-id = do {
+            my $sth = $!dbh.prepare(qq[
+                SELECT id FROM queue_v2 WHERE name = ?
+            ]);
+            $sth.execute($name);
+            $sth.row.[0];
+        }
+
+        {
+            my $sth = $!dbh.prepare(qq[
+                INSERT INTO queue_program_v1(queue_id, program_id)
+                VALUES (?, ?)
+            ]);
+            $sth.execute($queue-id, $id);
+
+            $sth.insert-id;
+        }
+
+        Nil
     }
 }
 
@@ -157,7 +199,9 @@ method dequeue-program() {
     return $descriptor;
 }
 
-method check-nonce(Int $nonce) {
+subset Nonce of Str where /^ <[a..z A..Z 0..9]> ** 10 $/;
+
+method check-nonce(Nonce $nonce) {
     my $okay = False;
     self.txn: {
         my $sth = $!dbh.prepare(qq[

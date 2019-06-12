@@ -2,21 +2,27 @@
 use v6;
 
 use Base64;
+use Crypt::RSA;
 use JSON::Fast;
 use Smack::Client;
 use Smack::Client::Request::Common;
 
 my %*SUB-MAIN-OPTS = :named-anywhere;
 
-constant $API-URL   = "https://nametag.zostay.com";
-constant $ZOSTAYIFY = ~$*PROGRAM-NAME.IO.parent.add("zostayify");
+constant $ADMIN-TOKEN = ~$*PROGRAM-NAME.IO.parent.parent.add("admin.token");
+constant $API-URL     = "https://nametag.zostay.com";
+constant $ZOSTAYIFY   = ~$*PROGRAM-NAME.IO.parent.add("zostayify");
+constant $ID          = "zostay";
 
-my $ua       = Smack::Client.new;
-my $api-url  = $API-URL;
+my $ua          = Smack::Client.new;
+my $api-url     = $API-URL;
+my $admin-token = $ADMIN-TOKEN;
 
 sub set-globals($url) {
-    $api-url = $url;
+    $api-url  = $url;
 }
+
+sub authorization($id) { "Bearer $admin-token.IO.slurp.chomp()" }
 
 sub api-url($path) { $api-url ~ $path }
 
@@ -26,8 +32,34 @@ sub get-program($program) {
     EVALFILE $program;
 }
 
-sub list-programs() {
-    my $req = GET(api-url("/program"));
+sub do-GET($path) {
+    GET(api-url($path), Authorization => authorization($ID));
+}
+
+sub do-POST($path, %postdata) {
+    my $content = to-json(%postdata);
+    POST(api-url($path), :$content,
+        Content-Type  => 'application/json; charset=utf-8',
+        Authorization => authorization($ID),
+    );
+}
+
+multi list-programs() {
+    my $req = do-GET("/program");
+    my $res = await $ua.request($req);
+
+    unless $res.code == 200 {
+        note "Bad stuff: $res.gist()";
+        note $res.content;
+        exit 1;
+    }
+
+    my $programs = from-json($res.content);
+    $programs<programs>;
+}
+
+multi list-programs(:$queue!) {
+    my $req = do-GET("/queue/$queue");
     my $res = await $ua.request($req);
 
     unless $res.code == 200 {
@@ -42,9 +74,10 @@ sub list-programs() {
 
 sub upload-program($name, $author, $program-bin) {
     my $program = encode-base64($program-bin.buf8, :str);
-    my $content = to-json(%( :$name, :$author, :$program ));
 
-    my $req = POST(api-url("/program"), :$content, Content-Type => 'application/json; charset=utf-8');
+    my $req = do-POST("/program", %(
+        :$name, :$author, :$program,
+    ));
     my $res = await $ua.request($req);
 
     unless $res.code == 200 || $res.code == 201 {
@@ -55,6 +88,17 @@ sub upload-program($name, $author, $program-bin) {
 
     my $created = from-json($res.content);
     say "ID: $created<id>";
+}
+
+sub enqueue-program($queue-name, $id) {
+    my $req = do-POST("/queue/$queue-name", %( :$id ));
+    my $res = await $ua.request($req);
+
+    unless $res.code == 200 || $res.code == 201 {
+        note "Bad stuff: $res.gist()";
+        note $res.content;
+        exit 1;
+    }
 }
 
 sub dump-cpp($program) {
@@ -101,10 +145,10 @@ multi MAIN('dump', Str $program-file, Bool :$cpp, Bool :$bin) {
     }
 }
 
-multi MAIN('list', Str :$url = $API-URL) {
+multi MAIN('list', Str :$queue, Str :$url = $API-URL) {
     set-globals($url);
 
-    my @programs := list-programs();
+    my @programs := $queue ?? list-programs(:$queue) !! list-programs();
     for @programs -> $program {
         say "$program<id>: $program<name> ($program<author>)";
     }
@@ -120,6 +164,12 @@ multi MAIN('upload', Str $program-file, ProgramName :$name!, AuthorName :$author
     my $program = get-program($program-file);
 
     upload-program($name, $author, $program);
+}
+
+multi MAIN('enqueue', Str $queue-name, Int $program-id, Str :$url = $API-URL) {
+    set-globals($url);
+
+    enqueue-program($queue-name, $program-id);
 }
 
 multi MAIN('generate-keys') {

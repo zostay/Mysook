@@ -15,5 +15,5 @@ docker run -P -d --name nametag --network nametag --rm \
     -e DB_PASSWORD=nametag123 \
     -e DB_HOST=nametag-mysql \
     -e DB_PORT=3306 \
-    -e DEVICE_KEY=$(cat private.key) \
+    -e DEVICE_KEY=$(cat public.key) \
     nametag
