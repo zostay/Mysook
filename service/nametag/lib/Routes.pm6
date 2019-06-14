@@ -32,7 +32,8 @@ class AdminAuth does Cro::HTTP::Middleware::Request {
         # public key... because that should only be me. :)
         supply whenever $requests -> $req {
             my $auth = Nil;
-            with $req.header('Authorization') -> $auth-header {
+            my $header = $req.header('Authorization');
+            with $header -> $auth-header {
                 my ($type, $credentials) = $auth-header.split(' ', 2);
 
                 if $type.lc eq 'bearer' {
@@ -43,6 +44,19 @@ class AdminAuth does Cro::HTTP::Middleware::Request {
             $req.auth = $auth;
             emit $req;
         }
+    }
+}
+
+sub check-auth(&code) {
+    if request.auth ~~ LoggedAdmin {
+        code();
+    }
+    else {
+        response.status = 401;
+        content 'application/json', %(
+            error   => True,
+            message => 'unauthorized',
+        );
     }
 }
 
@@ -74,50 +88,52 @@ sub routes() is export {
     $db.create-schema;
 
     my $rate-limited-routes = route {
-        before AdminAuth.new(:$db);
+        before AdminAuth.new;
         before RateLimiter.new(:$db);
 
         # Upload a program
-        post -> LoggedAdmin, 'program' {
-            request-body -> %program {
-                %program<name>.defined && %program<name> ~~ /\w+/
-                    or die X::ValidationFail.new("name", "You must give your program a name.");
-                my $name = %program<name>.trim;
+        post -> 'program' {
+            check-auth {
+                request-body -> %program {
+                    %program<name>.defined && %program<name> ~~ /\w+/
+                        or die X::ValidationFail.new("name", "You must give your program a name.");
+                    my $name = %program<name>.trim;
 
-                %program<author>.defined && %program<author> ~~ /^[github|cpan|http|https]:\S+/
-                    or die X::ValidationFail.new("author", "You must give a URL claiming authorship, e.g., github:zostay, cpan:HANENKAMP, or https://sterling.hanenkamp.com/");
-                my $author = %program<author>.trim;
+                    %program<author>.defined && %program<author> ~~ /^[github|cpan|http|https]:\S+/
+                        or die X::ValidationFail.new("author", "You must give a URL claiming authorship, e.g., github:zostay, cpan:HANENKAMP, or https://sterling.hanenkamp.com/");
+                    my $author = %program<author>.trim;
 
-                %program<program>.defined && %program<program> ~~ m{^<[a..zA..Z0..9+/]> ** 22..87382 '='* $}
-                    or die X::ValidationFail.new("program", "You must provide the program as a BASE-64 encoded string.");
-                my $b64-program = %program<program>;
-                my $bin-program = decode-base64($b64-program, :bin);
+                    %program<program>.defined && %program<program> ~~ m{^<[a..zA..Z0..9+/]> ** 22..87382 '='* $}
+                        or die X::ValidationFail.new("program", "You must provide the program as a BASE-64 encoded string.");
+                    my $b64-program = %program<program>;
+                    my $bin-program = decode-base64($b64-program, :bin);
 
-                {
-                    validate-program($bin-program);
+                    {
+                        validate-program($bin-program);
 
-                    CATCH {
-                        when (X::NameTag::ProgramValidator) {
-                            die X::ValidationFail.new("program", "Your program is not valid: $_");
+                        CATCH {
+                            when (X::NameTag::ProgramValidator) {
+                                die X::ValidationFail.new("program", "Your program is not valid: $_");
+                            }
                         }
                     }
-                }
 
-                my $id = $db.save-program($name, $author, $bin-program);
-                created "program/$id", 'application/json', %(
-                    id      => $id,
-                    name    => $name,
-                    author  => $author,
-                    program => encode-base64($bin-program, :str),
-                );
+                    my $id = $db.save-program($name, $author, $bin-program);
+                    created "program/$id", 'application/json', %(
+                        id      => $id,
+                        name    => $name,
+                        author  => $author,
+                        program => encode-base64($bin-program, :str),
+                    );
 
-                CATCH {
-                    when X::ValidationFail {
-                        bad-request 'application/json', %(
-                            error   => True,
-                            field   => .field,
-                            message => .message,
-                        );
+                    CATCH {
+                        when X::ValidationFail {
+                            bad-request 'application/json', %(
+                                error   => True,
+                                field   => .field,
+                                message => .message,
+                            );
+                        }
                     }
                 }
             }
@@ -125,7 +141,7 @@ sub routes() is export {
 
         # Enqueue a program
         post -> 'queue', QueueName $name {
-            if request.auth ~~ LoggedAdmin {
+            check-auth {
                 request-body -> %program-info (AutoID :$id) {
                     my %program = $db.load-program($id);
                     with %program<id> {
@@ -141,13 +157,6 @@ sub routes() is export {
                         );
                     }
                 }
-            }
-            else {
-                response.status = 401;
-                content 'application/json', %(
-                    error   => True,
-                    message => 'unauthorized',
-                );
             }
         }
 
@@ -185,11 +194,21 @@ sub routes() is export {
 
 
     my $nametag-routes = route {
-        before AdminAuth.new(:$db);
+        before AdminAuth.new;
 
         # Dequeue a program
-        post -> LoggedAdmin, 'next-program' {
-            content 'application/octet', $db.dequeue-program;
+        post -> 'next-program' {
+            check-auth {
+                content 'application/octet', $db.dequeue-program;
+            }
+        }
+
+        # Get a specific program
+        get -> 'program', AutoID $id, 'descriptor' {
+            check-auth {
+                my %program = $db.load-program($id);
+                content 'application/octet', %program<descriptor>;
+            }
         }
     }
 

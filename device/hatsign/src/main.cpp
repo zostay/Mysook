@@ -19,6 +19,7 @@
 #endif//ARDUINO
 
 #include "nametag.h"
+#include "nametag-fetch.h"
 
 #ifdef ARDUINO
 #define MATRIXPIN 14
@@ -42,7 +43,10 @@ mysook::SimPanel<32,8> display;
 mysook::Network network;
 #endif//ARDUINO
 
-NameTag nametag(logger, display, led, network);
+const char *base_url = "http://192.168.205.116:10000";
+NameTagFetch fetcher(logger, base_url);
+
+NameTag nametag(logger, display, led, network, fetcher);
 
 void setup() {
 #ifdef ARDUINO
@@ -72,10 +76,11 @@ void setup() {
 }
 
 void loop() {
-    if (millis() % 10000 == 0) {
-        int volts = analogRead(BATPIN);
-        logger.logf_ln("I [main] VBAT: %0.3fV", volts * .002);
-    }
+    // In case I add need to read the potential divider
+    // if (micros() % 10000000UL == 0) {
+    //     int volts = analogRead(BATPIN);
+    //     logger.logf_ln("I [main] VBAT: %0.3fV", volts * .002);
+    // }
 
     nametag.loop();
 }

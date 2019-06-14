@@ -131,17 +131,29 @@ sub dump-bin($program) {
     for @($program.buf8) { .chr.print }
 }
 
-multi MAIN('dump', Str $program-file, Bool :$cpp, Bool :$bin) {
+sub dump-hex($program) {
+    for @($program.buf8).kv -> $i, $byte {
+        printf("PP%04X ", $i/4) if $i %% 16;
+        $byte.fmt("%02X ").print;
+        print("\n") if (1+$i) %% 16;
+    }
+    print("\n");
+}
+
+multi MAIN('dump', Str $program-file, Bool :$cpp, Bool :$bin, Bool :$hex) {
     my $program = get-program($program-file);
 
-    if ($cpp && !$bin) {
+    if ($cpp && !$bin && !$hex) {
         dump-cpp($program);
     }
-    elsif ($bin && !$cpp) {
+    elsif ($bin && !$cpp && !$hex) {
         dump-bin($program);
     }
+    elsif ($hex && !$cpp && !$bin) {
+        dump-hex($program);
+    }
     else {
-        note "Please specify either --cpp or --bin";
+        note "Please specify one of --cpp or --bin or --hex";
     }
 }
 

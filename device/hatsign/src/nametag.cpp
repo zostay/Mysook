@@ -57,18 +57,61 @@ void NameTag::tick() {
 //    matrix.draw();
     //logf_ln("D [nametag] TICK");
 
+    if (!fetched && network.connected()) {
+        this->add_pre_ticker(&flipper);
+        fetcher.fetch_queue("hatsign");
+        fetched = true;
+    }
+
+    if (flipper.ready()) {
+        WebProgramInfo *web_binary = fetcher.next_program();
+        logf_ln("I [nametag] Switching programs to #%d: %s (%s)",
+            web_binary->get_program_id(),
+            web_binary->get_name().c_str(),
+            web_binary->get_author().c_str());
+        replace_program(web_binary->get_program());
+        flipper.reset();
+    }
+
     if (vm->has_halted()) {
         logf_ln("W [nametag] VM halt detected, returning to built-in program");
 
-        if (web_binary) {
-            delete web_binary;
-            web_binary = 0;
-            this->remove_post_ticker(vm);
-            delete vm;
-        }
+        replace_program(0);
+    }
 
+}
+
+void NameTag::clear_program() {
+    log.logf_ln("E [nametag] Halting to clear program.");
+
+    vm->halt();
+    this->remove_post_ticker(vm);
+
+    if (web_binary) {
+        delete web_binary;
+        web_binary = 0;
+        delete vm;
+    }
+}
+
+void NameTag::replace_program(const uint32_t *binary) {
+    clear_program();
+
+    if (binary) {
+        web_binary = binary;
+
+        uint32_t start          = binary[0];
+        const uint32_t *program = binary + 1;
+
+        vm = new VM<32,8>(this->log, matrix, program, start);
+        vm->begin();
+
+        this->add_post_ticker(vm);
+    }
+    else {
         vm = &builtin;
         vm->begin();
+
         this->add_post_ticker(vm);
     }
 }

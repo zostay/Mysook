@@ -1,3 +1,4 @@
+#include <arduino.h>
 #include <Logger.h>
 #include <cstdarg>
 #include <cstdio>
@@ -7,10 +8,11 @@
 
 using namespace mysook;
 
-#define PRINT_BUF   256
+#define PRINT_BUF   1024
+char buf[PRINT_BUF];
+
 void Logger::vlogf_ln(const char *fmt, va_list args) {
-    char buf[PRINT_BUF];
-    vsnprintf(buf, sizeof(buf) - 2, fmt, args);
+    vsnprintf(buf, PRINT_BUF - 2, fmt, args);
 
     for (int i = 0; i < PRINT_BUF; ++i) {
         if (buf[i] == '\0') {
@@ -32,7 +34,6 @@ void Logger::logf_ln(const char *fmt ...) {
 }
 
 void Logger::vlogf(const char *fmt, va_list args) {
-    char buf[PRINT_BUF];
     vsnprintf(buf, sizeof(buf) - 2, fmt, args);
 
     write_log(buf);

@@ -16,7 +16,7 @@
 #include <stdlib.h>
 #endif//ARDUINO
 
-#define MAX_TIME_SLICE 25000ul
+#define MAX_TIME_SLICE 50000ul
 
 #define STACK_SIZE 4096
 #define HEAP_SIZE  256
@@ -24,7 +24,17 @@
 #define PANEL_WIDTH 12
 #define PANEL_HEIGHT 6
 
-#define MAX_BRIGHTNESS 30
+#define MAX_BRIGHTNESS 20
+
+//#define ENABLE_VM_DEBUGGING
+
+#ifdef ENABLE_VM_DEBUGGING
+#define DEBUG(fmt, ...) log.logf_ln(fmt, __VA_ARGS__)
+#define TRACE(fmt, ...) log.logf_ln(fmt, __VA_ARGS__)
+#else
+#define DEBUG(fmt, ...)
+#define TRACE(fmd, ...)
+#endif
 
 template <int W, int H>
 void op_mask_columns(VM<W,H> &);
@@ -108,8 +118,8 @@ public:
     void tick_exec();
 
     void jump_sub(int new_program_ptr) {
-        //log.logf_ln("T [vm] JUMP <PP:%08X>", new_program_ptr);
-        //log.logf_ln("D [vm] save <PP:%08X>", program_ptr);
+        TRACE("T [vm] JUMP <PP:%08X>", new_program_ptr);
+        DEBUG("D [vm] save <PP:%08X>", program_ptr);
         push(program_ptr);
         push(get_register(REG_STACK_SEGMENT));
         set_register(REG_STACK_SEGMENT, stack_ptr);
@@ -121,7 +131,7 @@ public:
         int return_ptr = read_stack(new_stack_ptr - 2);
         uint32_t segment_ptr = read_stack(new_stack_ptr - 1);
 
-        //log.logf_ln("T [vm] RETURN <PP:%08X> TO <PP:%08X> STACK %d SS %lu", program_ptr, return_ptr, stack_ptr, segment_ptr);
+        TRACE("T [vm] RETURN <PP:%08X> TO <PP:%08X> STACK %d SS %lu", program_ptr, return_ptr, stack_ptr, segment_ptr);
 
         stack_ptr = new_stack_ptr - 2;
         jump(return_ptr);
@@ -136,7 +146,7 @@ public:
             return;
         }
 
-        //log.logf_ln("D [vm] jump <PP:%08X>", new_program_ptr);
+        DEBUG("D [vm] jump <PP:%08X>", new_program_ptr);
         program_ptr = new_program_ptr; 
     }
 
@@ -152,7 +162,7 @@ public:
             return 0;
         }
 
-        //log.logf_ln("D [vm] get register %d -> %d", reg, registers[reg]);
+        DEBUG("D [vm] get register %d -> %d", reg, registers[reg]);
 
         return registers[reg];
     }
@@ -165,7 +175,7 @@ public:
             return;
         }
 
-        //log.logf_ln("D [vm] set register %d <- %u", reg, val);
+        DEBUG("D [vm] set register %d <- %u", reg, val);
         registers[reg] = val;
 
         switch (reg) {
@@ -233,7 +243,7 @@ public:
             return 0;
         }
 
-        //log.logf_ln("T [vm] <PP:%08X> READ %d -> %d", program_ptr, stack_ptr, stack[stack_ptr]);
+        TRACE("T [vm] <PP:%08X> READ %d -> %d", program_ptr, stack_ptr, stack[stack_ptr]);
         return stack[stack_ptr];
     }
 
@@ -245,7 +255,7 @@ public:
             return;
         }
 
-        //log.logf_ln("T [vm] <PP:%08X> WRITE %d <- %d", program_ptr, stack_ptr, val);
+        TRACE("T [vm] <PP:%08X> WRITE %d <- %d", program_ptr, stack_ptr, val);
         stack[stack_ptr] = val;
     }
 
@@ -283,7 +293,7 @@ void VM<W,H>::begin() {
     this->grid.setFont(&TomThumb);
     this->grid.setTextWrap(false);
 
-    halted = 0;
+    halted = false;
 
     call_index.clear();
 
@@ -325,7 +335,7 @@ void VM<W,H>::scan_subs() {
     int i = 0;
     while (program[i] != OP_HALT) {
         if (program[i] == OP_SUB) {
-            //log.logf_ln("D [vm] call_index %d -> <PP:%08X>", program[i + 1], i);
+            log.logf_ln("I [vm] call_index %d -> <PP:%08X>", program[i + 1], i);
             call_index[ program[i + 1] ] = i;
         }
 
@@ -370,7 +380,7 @@ void VM<W,H>::step_exec() {
             }
             catch (std::out_of_range e) {
                 // PANIC!
-                log.logf_ln("E [vm] invalid opcode %d", s);
+                log.logf_ln("E [vm] <PP:%08X> invalid opcode %d", program_ptr, s);
                 halt();
             }
         }
@@ -379,30 +389,30 @@ void VM<W,H>::step_exec() {
     case MODE_BRIGHTNESS:
         in_tick_mode = true;
         tick_mode_op = op_codes.at(OP_BRIGHTNESS);
-        //log.logf_ln("T [vm] <PP:%08X> EXEC %08X", program_ptr, OP_BRIGHTNESS);
+        TRACE("T [vm] <PP:%08X> EXEC %08X", program_ptr, OP_BRIGHTNESS);
         break;
 
     case MODE_MASK_ROWS:
         in_tick_mode = true;
         tick_mode_op = op_codes.at(OP_MASK_ROWS);
-        //log.logf_ln("T [vm] <PP:%08X> EXEC %08X", program_ptr, OP_MASK_ROWS);
+        TRACE("T [vm] <PP:%08X> EXEC %08X", program_ptr, OP_MASK_ROWS);
         break;
 
     case MODE_MASK_COLUMNS:
         in_tick_mode = true;
         tick_mode_op = op_codes.at(OP_MASK_COLUMNS);
-        //log.logf_ln("T [vm] <PP:%08X> EXEC %08X", program_ptr, OP_MASK_COLUMNS);
+        TRACE("T [vm] <PP:%08X> EXEC %08X", program_ptr, OP_MASK_COLUMNS);
         break;
 
     case MODE_MASK_BITS:
         in_tick_mode = true;
         tick_mode_op = op_codes.at(OP_MASK_BITS);
-        //log.logf_ln("T [vm] <PP:%08X> EXEC %08X", program_ptr, OP_MASK_BITS);
+        TRACE("T [vm] <PP:%08X> EXEC %08X", program_ptr, OP_MASK_BITS);
         break;
 
     default:
         // PANIC!
-        log.logf_ln("E [vm] invalid tick mode %d", mode);
+        log.logf_ln("E [vm] invalid tick mode %08x", mode);
         halt();
         return;
     }
@@ -424,7 +434,7 @@ void VM<W,H>::step_exec() {
     //    stack_str += String(stack[i]);
     //    first = false;
     //}
-    //log.logf_ln("T [vm] <PP:%08X> STACK: %s", stack_str.c_str());
+    //TRACE("T [vm] <PP:%08X> STACK: %s", stack_str.c_str());
 }
 
 template <int W, int H>
@@ -438,7 +448,7 @@ void VM<W,H>::tick_exec() {
 
         // a tick is only permitted to be MAX_TIME_SLICE long
         if (tick_start + MAX_TIME_SLICE < mysook::get_micros()) {
-            log.logf_ln("W [vm] <PP:%08X> Skipping tick: the program took too long.");
+            log.logf_ln("W [vm] <PP:%08X> Skipping tick: the program took too long.", program_ptr);
             break;
         }
     }
@@ -456,7 +466,7 @@ uint32_t VM<W,H>::pop() {
     }
     else {
         registers[REG_MARK]--;
-        //log.logf_ln("T [vm] <PP:%08X> POP %08X", program_ptr, stack[ stack_ptr - 1 ]);
+        TRACE("T [vm] <PP:%08X> POP %08X", program_ptr, stack[ stack_ptr - 1 ]);
         return stack[ --stack_ptr ];
     }
 }
@@ -470,7 +480,7 @@ void VM<W,H>::push(uint32_t v) {
     }
     else {
         registers[REG_MARK]++;
-        //log.logf_ln("T [vm] <PP:%08X> PUSH %08X", program_ptr, v);
+        TRACE("T [vm] <PP:%08X> PUSH %08X", program_ptr, v);
         stack[ stack_ptr++ ] = v;
     }
 }
@@ -486,7 +496,7 @@ mysook::Color VM<W,H>::get_register_color(int reg) {
 
     mysook::Color color(registers[reg]);
 
-    //log.logf_ln("D [vm] 0x%06X -> (%d, %d, %d)", registers[reg], color.r, color.g, color.b);
+    DEBUG("D [vm] 0x%06X -> (%d, %d, %d)", registers[reg], color.r, color.g, color.b);
 
     return color;
 }
@@ -500,14 +510,14 @@ void VM<W,H>::set_register_color(int reg, mysook::Color val) {
         return; 
     }
 
-    //log.logf_ln("D [vm] (%d, %d, %d) -> 0x%06X", val.r, val.g, val.b, val.truecolor());
+    DEBUG("D [vm] (%d, %d, %d) -> 0x%06X", val.r, val.g, val.b, val.truecolor());
 
     set_register(reg, val.truecolor());
 }
 
 template <int W, int H>
 void VM<W,H>::apply_column_mask(uint32_t mask) {
-    //log.logf_ln("D [vm] <PP:%08X> COLUMN MASK %08X", program_ptr, mask);
+    DEBUG("D [vm] <PP:%08X> COLUMN MASK %08X", program_ptr, mask);
 
     clear_bitmask();
 
@@ -516,7 +526,7 @@ void VM<W,H>::apply_column_mask(uint32_t mask) {
         uint32_t sel_mask = bit_mask >> x;
         uint32_t col_mask = mask & sel_mask;
 
-        //log.logf_ln("D [vm] <PP:%08X> SET BIT %08X", program_ptr, col_mask);
+        DEBUG("D [vm] <PP:%08X> SET BIT %08X", program_ptr, col_mask);
 
         for (int mp = 0; mp < H; ++mp) _panel_bitmask[mp] |= col_mask;
     }
@@ -531,19 +541,19 @@ void VM<W,H>::draw() {
     uint32_t base_mask = 0x01 << (W - 1);
     for (int y = 0; y < H; y++) {
         uint32_t row_mask = _panel_bitmask[y];
-        //log.logf_ln("D [vm] row %d mask 0x%03X", y, row_mask);
+        DEBUG("D [vm] row %d mask 0x%03X", y, row_mask);
 
         for (int x = 0; x < W; x++) {
             uint32_t bit_mask = base_mask >> x;
-            //log.logf_ln("D [vm] bit %d mask 0x%03X", x, bit_mask);
+            DEBUG("D [vm] bit %d mask 0x%03X", x, bit_mask);
 
             if (bit_mask & row_mask) {
                 mysook::Color c(buf[i]);
-                //log.logf_ln("D [vm] unmasking (%d, %d) <- (%d, %d, %d)", x, y, c.r, c.g, c.b);
+                DEBUG("D [vm] unmasking (%d, %d) <- (%d, %d, %d)", x, y, c.r, c.g, c.b);
                 panel.put_pixel(x, y, c);
             }
             else {
-                //log.logf_ln("D [vm] masking (%d, %d)", x, y);
+                DEBUG("D [vm] masking (%d, %d)", x, y);
                 panel.put_pixel(x, y, mask_color);
             }
 
@@ -551,7 +561,8 @@ void VM<W,H>::draw() {
         }
     }
 
-    panel.set_brightness(this->brightness);
+    panel.set_brightness(this->brightness > MAX_BRIGHTNESS ? MAX_BRIGHTNESS : this->brightness);
+    delay(1); // See https://github.com/adafruit/Adafruit_NeoPixel/issues/139
     panel.draw(); 
 }
 
