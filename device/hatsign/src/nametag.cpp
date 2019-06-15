@@ -65,12 +65,8 @@ void NameTag::tick() {
     }
 
     if (flipper.ready()) {
-        WebProgramInfo *web_binary = fetcher.next_program();
-        logf_ln("I [nametag] Switching programs to #%d: %s (%s)",
-            web_binary->get_program_id(),
-            web_binary->get_name().c_str(),
-            web_binary->get_author().c_str());
-        replace_program(web_binary->get_program());
+        WebProgramInfo *binary = fetcher.next_program();
+        replace_program(binary);
         flipper.reset();
     }
 
@@ -89,20 +85,25 @@ void NameTag::clear_program() {
     this->remove_post_ticker(vm);
 
     if (web_binary) {
-        delete web_binary;
         web_binary = 0;
         delete vm;
     }
 }
 
-void NameTag::replace_program(const uint32_t *binary) {
+void NameTag::replace_program(const WebProgramInfo *binary) {
     clear_program();
 
     if (binary) {
+        logf_ln("I [nametag] Switching programs to #%d: %s (%s)",
+            binary->get_program_id(),
+            binary->get_name().c_str(),
+            binary->get_author().c_str());
+
         web_binary = binary;
 
-        uint32_t start          = binary[0];
-        const uint32_t *program = binary + 1;
+        const uint32_t *web_program = binary->get_program();
+        uint32_t start          = web_program[0];
+        const uint32_t *program = web_program + 1;
 
         vm = new VM<32,8>(this->log, matrix, program, start);
         vm->begin();

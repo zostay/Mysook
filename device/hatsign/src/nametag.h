@@ -45,7 +45,7 @@ private:
     VM<32,8> builtin;
     VM<32,8> *vm;
 
-    const uint32_t *web_binary;
+    const WebProgramInfo *web_binary;
 
     int x = matrix.panel_width();
 
@@ -67,7 +67,7 @@ public:
     virtual void start();
     virtual void tick();
 
-    void replace_program(const uint32_t *binary);
+    void replace_program(const WebProgramInfo *binary);
     void clear_program();
 };
 

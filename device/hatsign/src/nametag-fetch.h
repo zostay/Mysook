@@ -30,14 +30,14 @@ public:
     }
     void lock() { write_locked = true; }
 
-    int get_program_id() { return program_id; }
-    String &get_name() { return name; }
-    String &get_author() { return author; }
-    const uint32_t *get_program() { return program; }
+    int get_program_id() const { return program_id; }
+    const String &get_name() const { return name; }
+    const String &get_author() const { return author; }
+    const uint32_t *get_program() const { return program; }
 
     void refinc() { refcount++; }
     void refdec() { refcount--; }
-    int get_refcount() { return refcount; }
+    int get_refcount() const { return refcount; }
 };
 
 class NameTagFetch {
