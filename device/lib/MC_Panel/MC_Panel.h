@@ -45,12 +45,12 @@ class MC_RGBPanel : public RGBPanel<W, H> {
 
         virtual void draw() {
 #ifdef ESP32
-            portDISABLE_INTERRUPTS();
+            //portDISABLE_INTERRUPTS();
             //Serial.println("IRQ: off");
 #endif
             panel.show();
 #ifdef ESP32
-            portENABLE_INTERRUPTS();
+            //portENABLE_INTERRUPTS();
             //Serial.println("IRQ: on");
 #endif
         }

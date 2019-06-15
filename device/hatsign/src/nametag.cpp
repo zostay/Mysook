@@ -57,27 +57,28 @@ void NameTag::tick() {
 //    matrix.draw();
     //logf_ln("D [nametag] TICK");
 
-    if (!fetched && network.connected()) {
-        this->add_pre_ticker(&flipper);
-        fetcher.fetch_queue("hatsign");
-        fetched = true;
-    }
-
-    if (flipper.ready()) {
-        WebProgramInfo *web_binary = fetcher.next_program();
-        logf_ln("I [nametag] Switching programs to #%d: %s (%s)",
-            web_binary->get_program_id(),
-            web_binary->get_name().c_str(),
-            web_binary->get_author().c_str());
-        replace_program(web_binary->get_program());
-        flipper.reset();
-    }
-
-    if (vm->has_halted()) {
-        logf_ln("W [nametag] VM halt detected, returning to built-in program");
-
-        replace_program(0);
-    }
+//    if (!fetched && network.connected()) {
+//        fetcher.fetch_queue("hatsign");
+//        fetched = true;
+//
+//        this->add_pre_ticker(&flipper);
+//    }
+//
+//    if (flipper.ready()) {
+//        WebProgramInfo *web_binary = fetcher.next_program();
+//        logf_ln("I [nametag] Switching programs to #%d: %s (%s)",
+//            web_binary->get_program_id(),
+//            web_binary->get_name().c_str(),
+//            web_binary->get_author().c_str());
+//        replace_program(web_binary->get_program());
+//        flipper.reset();
+//    }
+//
+//    if (vm->has_halted()) {
+//        logf_ln("W [nametag] VM halt detected, returning to built-in program");
+//
+//        replace_program(0);
+//    }
 
 }
 

@@ -1,3 +1,4 @@
 *.o
 .precomp
 secrets.h
+secrets.cpp
