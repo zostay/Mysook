@@ -60,22 +60,6 @@ sub check-auth(&code) {
     }
 }
 
-class RateLimiter does Cro::HTTP::Middleware::Request {
-    has $.db;
-
-    method process(Supply $requests --> Supply) {
-        supply whenever $requests -> $req {
-            my $length = $!db.queue-length;
-
-            # The longer the queue, the longer the wait time, up to 60 seconds
-            my $wait-time = 60 min e ** $length / 7;
-            sleep $wait-time if $wait-time > 1;
-
-            emit $req;
-        }
-    }
-}
-
 class X::ValidationFail is Exception {
     has $.field;
     has $.message;
@@ -89,7 +73,6 @@ sub routes() is export {
 
     my $rate-limited-routes = route {
         before AdminAuth.new;
-        before RateLimiter.new(:$db);
 
         # Upload a program
         post -> 'program' {
@@ -197,9 +180,9 @@ sub routes() is export {
         before AdminAuth.new;
 
         # Dequeue a program
-        post -> 'next-program' {
+        post -> 'next-program', QueueName $queue-name {
             check-auth {
-                content 'application/octet', $db.dequeue-program;
+                content 'application/octet', $db.dequeue-program($queue-name);
             }
         }
 

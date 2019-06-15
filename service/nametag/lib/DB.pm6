@@ -173,26 +173,29 @@ method enqueue-program(Str $name, Int $id --> Nil) {
     }
 }
 
-method dequeue-program() {
+method dequeue-program($queue-name) {
     my $descriptor;
     self.txn: {
         my $sth = $!dbh.prepare(qq[
-            SELECT q.id, p.descriptor
-            FROM queue_v1 q JOIN program_v1 p ON (q.program_id = p.id)
-            ORDER BY q.dequeued DESC, q.id ASC, RAND()
-            LIMIT 1;
+            SELECT qp.id, p.descriptor
+              FROM queue_v2 q
+              JOIN queue_program_v1 qp ON (qp.queue_id = q.id)
+              JOIN program_v1 p ON (qp.program_id = p.id)
+             WHERE q.name = ?
+          ORDER BY q.dequeued DESC, q.id ASC, RAND()
+              LIMIT 1;
         ]);
-        $sth.execute;
+        $sth.execute($queue-name);
 
-        my $q-id;
-        ($q-id, $descriptor) = $sth.row;
+        my $qp-id;
+        ($qp-id, $descriptor) = $sth.row;
 
-        if $q-id {
+        if $qp-id {
             $!dbh.do(qq[
-                UPDATE queue_v1
+                UPDATE queue_v2
                 SET dequeued = 1
                 WHERE id = ?
-            ], $q-id);
+            ], $qp-id);
         }
     }
 
@@ -217,15 +220,16 @@ method check-nonce(Nonce $nonce) {
     return $okay;
 }
 
-method queue-length() {
+method queue-length($queue-name) {
     my $length = 0;
     self.txn: {
         my $sth = $!dbh.prepare(qq[
             SELECT COUNT(*)
-            FROM queue_v1
-            WHERE !dequeued
+              FROM queue_program_v1 qp
+              JOIN queue_v2 q ON (qp.queue_id = q.id)
+             WHERE !qp.dequeued AND q.name = ?
         ]);
-        $sth.execute;
+        $sth.execute($queue-name);
         ($length) = $sth.row;
     }
 
