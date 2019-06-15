@@ -54,7 +54,7 @@ private:
 
 public:
     NameTag(mysook::Logger &log, mysook::RGBPanel<32,8> &_matrix, mysook::WiFiLED &_led, mysook::Network &network, NameTagFetch &fetcher) 
-    : flipper(10000000UL), Firmware(log), matrix(_matrix), led(_led), network(network), builtin(log, _matrix, default_program, PROGRAM_MAIN), log(log), fetcher(fetcher) { 
+    : flipper(60000000UL), Firmware(log), matrix(_matrix), led(_led), network(network), builtin(log, _matrix, default_program, PROGRAM_MAIN), log(log), fetcher(fetcher) { 
         this->add_pre_ticker(&network);
         this->add_pre_ticker(&led);
         
