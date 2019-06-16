@@ -148,6 +148,32 @@ sub routes() is export {
             my @programs = $db.list-queue($name);
             content 'application/json', %(:@programs);
         }
+
+        # Overwrite the queue completely
+        put -> 'queue', QueueName $name {
+            check-auth {
+                request-body -> %program-info {
+                    my $bad = False;
+                    for @(%program-info<programs>) -> %p {
+                        unless %p<id>.defined && %p<id> ~~ AutoID {
+                            $bad = True;
+                            last;
+                        }
+                    }
+
+                    if $bad {
+                        bad-request 'application/json', %(
+                            error => True,
+                            field => 'programs',
+                            message => 'You must name uploaded program IDs to set the queue.',
+                        );
+                    }
+
+                    my @programs = $db.set-queue($name, %program-info<programs>);
+                    content 'application/json', %(:@programs);
+                }
+            }
+        }
     }
 
     my $japh-routes = route {

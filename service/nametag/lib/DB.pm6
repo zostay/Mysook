@@ -236,3 +236,49 @@ method queue-length($queue-name) {
     return $length;
 }
 
+method set-queue($queue-name, @programs) {
+    self.txn: {
+        my @ids = gather {
+            my $sth = $!dbh.prepare(qq[
+                SELECT id
+                FROM program_v1
+                WHERE id = ?
+            ]);
+
+            for @programs -> % (:$id) {
+                $sth.execute($id);
+                my ($found-id) = $sth.row;
+                take $found-id with $found-id;
+            }
+        }
+
+        if @ids {
+            # clear queue
+            {
+                my $sth = $!dbh.prepare(qq[
+                    DELETE
+                      FROM queue_program_v1
+                     WHERE queue_id IN (SELECT id FROM queue_v2 WHERE name = ?)
+                ]);
+                $sth.execute($queue-name);
+            }
+
+            {
+                my $sth = $!dbh.prepare(qq[
+                    INSERT INTO queue_program_v1(queue_id, program_id)
+                         SELECT id, ?
+                           FROM queue_v2
+                          WHERE name = ?
+                ]);
+
+                # replace queue
+                for @ids -> $id {
+                    $sth.execute($id, $queue-name);
+                }
+            }
+        }
+    }
+
+    self.list-queue($queue-name);
+}
+

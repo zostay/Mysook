@@ -44,6 +44,14 @@ sub do-POST($path, %postdata) {
     );
 }
 
+sub do-PUT($path, %putdata) {
+    my $content = to-json(%putdata);
+    PUT(api-url($path), :$content,
+        Content-Type  => 'application/json; charset=utf-8',
+        Authorization => authorization($ID),
+    );
+}
+
 multi list-programs() {
     my $req = do-GET("/program");
     my $res = await $ua.request($req);
@@ -92,6 +100,19 @@ sub upload-program($name, $author, $program-bin) {
 
 sub enqueue-program($queue-name, $id) {
     my $req = do-POST("/queue/$queue-name", %( :$id ));
+    my $res = await $ua.request($req);
+
+    unless $res.code == 200 || $res.code == 201 {
+        note "Bad stuff: $res.gist()";
+        note $res.content;
+        exit 1;
+    }
+}
+
+sub set-queue($queue-name, @ids) {
+    my $req = do-PUT("/queue/$queue-name", %(
+        programs => @ids.map({ %( :$^id ) }),
+    ));
     my $res = await $ua.request($req);
 
     unless $res.code == 200 || $res.code == 201 {
@@ -182,6 +203,12 @@ multi MAIN('enqueue', Str $queue-name, Int $program-id, Str :$url = $API-URL) {
     set-globals($url);
 
     enqueue-program($queue-name, $program-id);
+}
+
+multi MAIN('set-queue', Str $queue-name, *@program-ids, Str :$url = $API-URL) {
+    set-globals($url);
+
+    set-queue($queue-name, @program-ids);
 }
 
 multi MAIN('generate-keys') {
