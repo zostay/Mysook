@@ -102,8 +102,8 @@ void NameTag::replace_program(const WebProgramInfo *binary) {
         web_binary = binary;
 
         const uint32_t *web_program = binary->get_program();
-        uint32_t start          = web_program[0];
-        const uint32_t *program = web_program + 1;
+        uint32_t start              = web_program[0];
+        const uint32_t *program     = web_program + 1;
 
         vm = new VM<32,8>(this->log, matrix, program, start);
         vm->begin();

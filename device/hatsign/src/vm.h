@@ -24,7 +24,7 @@
 #define PANEL_WIDTH 12
 #define PANEL_HEIGHT 6
 
-#define MAX_BRIGHTNESS 20
+#define MAX_BRIGHTNESS 75
 
 //#define ENABLE_VM_DEBUGGING
 

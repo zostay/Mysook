@@ -1,6 +1,7 @@
 #include <inttypes.h>
 #include "ops.h"
 
+// Sterling - ZipRecruiter
 uint32_t default_program[] = {
     OP_SUB, 1, OP_PUSH, 16777215, OP_PUSH, 0, OP_PUSH, 0, OP_PUSH, 2, OP_URGENCY,
     OP_PUSH, 75, OP_BRIGHTNESS, OP_SUB, 2, OP_RAND, OP_PUSH, 12632256, OP_OR,

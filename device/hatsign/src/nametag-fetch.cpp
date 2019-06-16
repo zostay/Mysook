@@ -163,6 +163,9 @@ void NameTagFetch::fetch_queue(const char *queue_name) {
         web_binary->write(0xDEAD);
         web_binary->write(0xDEAD);
 
+        //log.logf("%08x ", 0xDEAD);
+        //log.logf("%08x ", 0xDEAD);
+        //log.logf("%08x ", 0xDEAD);
         //log.logf_ln("");
 
         web_binary->lock();
