@@ -69,7 +69,7 @@ public:
 
 private:
     int i = 0;
-    int speed = 1000000;
+    unsigned long speed = 1000000ul;
     int blink_mode = BLINK_OFF;
 };
 
@@ -84,8 +84,8 @@ public:
         else if (!was_connecting && network.connecting()) {
              set_blink_mode(BLINK_BLINK, false);
         }
-        else if (was_connected && !network.connected()
-             || was_connecting && !network.connecting()) {
+        else if ((was_connected  && !network.connected())
+             ||  (was_connecting && !network.connecting())) {
 
              set_blink_mode(BLINK_OFF, false);
         }

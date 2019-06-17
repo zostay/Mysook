@@ -2,6 +2,7 @@
 #define __MC_NETWORK_H
 
 #include <functional>
+#include <stdlib.h>
 
 #include <Arduino.h>
 #include <Network.h>
@@ -153,7 +154,8 @@ protected:
                 last_announcement = micros();
             }
 
-            current = &memory[0];
+            int try_anyway_conn = rand() % conns;
+            current = &memory[try_anyway_conn];
         }
 
         // A network was found, pick it and connect

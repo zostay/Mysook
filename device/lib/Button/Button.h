@@ -6,7 +6,7 @@
 
 namespace mysook {
 
-typedef std::function<void(bool)> ButtonDispatcher;
+typedef std::function<void(bool, unsigned long)> ButtonDispatcher;
 
 class Button : public Ticking {
 public:
@@ -20,8 +20,11 @@ public:
         int new_button_state = digitalRead(pin);
         if (new_button_state != button_state) {
             // assumes HIGH is pressed
-            listener((button_state = new_button_state) == HIGH);
-        }   
+            unsigned long press_length = micros() - prev_tick;
+            listener((button_state = new_button_state) == HIGH, press_length);
+
+            prev_tick = micros();
+        }
     }
 
     int button_pin() { return pin; }
@@ -29,6 +32,7 @@ public:
 private:
     int pin;
     int button_state = LOW;
+    unsigned long prev_tick = 0;
 
     ButtonDispatcher &listener;
 };
