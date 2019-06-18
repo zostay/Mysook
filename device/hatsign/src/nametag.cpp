@@ -58,10 +58,11 @@ void NameTag::tick() {
     //logf_ln("D [nametag] TICK");
 
     if (!fetched && network.connected()) {
-        fetcher.fetch_queue("hatsign");
-        fetched = true;
+        if (fetcher.fetch_queue("hatsign")) {
+            fetched = true;
 
-        this->add_pre_ticker(&flipper);
+            this->add_pre_ticker(&flipper);
+        }
     }
 
     if (flipper.ready()) {

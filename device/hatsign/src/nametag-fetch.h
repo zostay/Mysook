@@ -45,6 +45,7 @@ private:
     mysook::Logger &log;
 
     const char *base_url;
+    const char *ca_cert;
 
     StaticJsonDocument<6000> qdata;
 
@@ -57,10 +58,10 @@ private:
     void clear_programs();
 
 public:
-    NameTagFetch(mysook::Logger &log, const char *base_url) : log(log), base_url(base_url) { }
+    NameTagFetch(mysook::Logger &log, const char *base_url, const char *ca_cert) : log(log), base_url(base_url), ca_cert(ca_cert) { }
     virtual ~NameTagFetch() { clear_programs(); }
 
-    void fetch_queue(const char *queue_name);
+    bool fetch_queue(const char *queue_name);
 
     WebProgramInfo *get_program(int i) {
         return 0 <= i && i < length ? programs[i] : 0;

@@ -52,7 +52,7 @@ bool NameTagFetch::readd_program(int program_id) {
     return false;
 }
 
-void NameTagFetch::fetch_queue(const char *queue_name) {
+bool NameTagFetch::fetch_queue(const char *queue_name) {
     clear_programs();
 
     String queue_url = String(base_url) 
@@ -60,24 +60,34 @@ void NameTagFetch::fetch_queue(const char *queue_name) {
                      + String(queue_name);
 
     HTTPClient ua;
-    ua.begin(queue_url);
+    WiFiClient *client;
+    if (String(base_url).startsWith(String("https:"))) {
+        WiFiClientSecure *secure_client = new WiFiClientSecure;
+        secure_client->setCACert(ca_cert);
+        client = secure_client;
+    }
+    else {
+        client = new WiFiClient;
+    }
+
+    ua.begin(*client, queue_url);
 
     int code;
     if ((code = ua.GET()) <= 0) {
         log.logf_ln("E [nametag-fetch] unable to fetch nametag queue %s", queue_name);
-        return;
+        return false;
     }
 
     if (code != 200) {
         log.logf_ln("E [nametag-fetch] unexpected HTTP status %d when fetching nametag queue %s", queue_name);
-        return;
+        return false;
     }
 
     String payload = ua.getString();
     auto error = deserializeJson(qdata, payload);
     if (error) {
         log.logf_ln("E [nametag-fetch] unable to read JSON %s", error.c_str());
-        return;
+        return false;
     }
 
     JsonArray programs = qdata["programs"].as<JsonArray>();
@@ -99,17 +109,17 @@ void NameTagFetch::fetch_queue(const char *queue_name) {
 
         log.logf_ln("I [nametag-fetch] Fetching program %d", program_id);
 
-        ua.begin(program_url);
+        ua.begin(*client, program_url);
         ua.addHeader("Authorization", admin_token);
 
         if ((code = ua.GET()) <= 0) {
             log.logf_ln("E [nametag-fetch] unable to fetch nametag program %d (%d): %s", program_id, code, ua.errorToString(code).c_str());
-            return;
+            return false;
         }
 
         if (code != 200) {
             log.logf_ln("E [nametag-fetch] unexpected HTTP status %d when fetching nametag program %d", code, program_id);
-            return;
+            return false;
         }
 
         // Program is too long
@@ -144,7 +154,7 @@ void NameTagFetch::fetch_queue(const char *queue_name) {
                 int byte_status = stream.read();
                 if (byte_status < 0) {
                     log.logf_ln("Shorted a byte at %d", i);
-                    return;
+                    return false;
                 }
 
                 //log.logf("%c", byte_status);
@@ -179,4 +189,8 @@ void NameTagFetch::fetch_queue(const char *queue_name) {
     }
 
     ua.end();
+    delete client;
+
+    return true;
 }
+

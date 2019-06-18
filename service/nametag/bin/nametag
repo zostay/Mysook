@@ -10,7 +10,7 @@ use Smack::Client::Request::Common;
 my %*SUB-MAIN-OPTS = :named-anywhere;
 
 constant $ADMIN-TOKEN = ~$*PROGRAM-NAME.IO.parent.parent.add("admin.token");
-constant $API-URL     = "https://nametag.zostay.com";
+constant $API-URL     = "http://nametag.zostay.com";
 constant $ZOSTAYIFY   = ~$*PROGRAM-NAME.IO.parent.add("zostayify");
 constant $ID          = "zostay";
 

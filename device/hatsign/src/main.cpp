@@ -43,9 +43,10 @@ mysook::SimPanel<32,8> display;
 mysook::Network network;
 #endif//ARDUINO
 
-const char *base_url = "http://192.168.205.116:10000";
-NameTagFetch fetcher(logger, base_url);
+const char *base_url = "http://nametag.zostay.com";
+const char *ca_cert = "";
 
+NameTagFetch fetcher(logger, base_url, ca_cert);
 NameTag nametag(logger, display, led, network, fetcher);
 
 void setup() {
