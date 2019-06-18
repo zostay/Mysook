@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 
+#include <MC_MDNS.h>
 #include <MC_Logger.h>
 #include <MC_Network.h>
 
@@ -12,11 +13,14 @@
 
 mysook::MC_Logger<Print> logger(micros, &Serial);
 mysook::MC_Network network(logger);
+mysook::MC_MDNS mdns("nopush-button", logger);
 
 NoPushButton nopush(logger, network, BUTTON_PIN, LIGHT_PIN);
 
 void setup() {
     Serial.begin(9600);
+
+    mdns.begin();
 
     for (int i = 0; i < ap_config_count; ++i) {
         logger.logf_ln("I [main] configuring AP: %s", ap_configs[i*2]);

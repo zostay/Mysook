@@ -9,6 +9,7 @@
 #include <Firmware.h>
 #include <LED.h>
 #include <Network.h>
+#include <MC_MDNS.h>
 
 using std::placeholders::_1;
 using std::placeholders::_2;

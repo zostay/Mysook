@@ -7,6 +7,7 @@
 #include <ESPmDNS.h>
 #endif//ESP8266
 
+#include <Logger.h>
 
 namespace mysook {
 
@@ -30,6 +31,15 @@ public:
 
     void add_service(const char *name, const char *proto, int port) {
         MDNS.addService(name, proto, port);
+    }
+
+    int query_service(const char *name, const char *proto) {
+        log.logf_ln("I [MC_MDNS] query for %s service over %s", name, proto);
+        return MDNS.queryService(name, proto);
+    }
+
+    IPAddress queried_ip_address(int idx) {
+        return MDNS.IP(idx);
     }
 };
 

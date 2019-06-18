@@ -35,7 +35,7 @@ Adafruit_NeoMatrix matrix = Adafruit_NeoMatrix(
 mysook::MC_Logger<Print> logger(&micros, Serial);
 mysook::MC_RGBPanel<32,8,Adafruit_NeoMatrix> display(matrix);
 mysook::MC_Network network(logger);
-//mysook::MC_MDNS mdns("zostay-nametag", logger);
+mysook::MC_MDNS mdns("zostay-nametag", logger);
 mysook::WiFiLED led(BLINKPIN, network);
 #else
 mysook::SimLogger logger;
@@ -69,7 +69,7 @@ void setup() {
     }
     network.connect();
 
-    //mdns.add_service("http", "tcp", 80);
+    mdns.add_service("zostayification", "udp", 10101);
 #endif//ARDUINO
 
     nametag.setup();
