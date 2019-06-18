@@ -136,6 +136,7 @@ method list-queue(Str $name) {
     INNER JOIN queue_program_v1 qp ON (p.id = qp.program_id)
     INNER JOIN queue_v2 q ON (q.id = qp.queue_id)
          WHERE q.name = ?
+      ORDER BY qp.id
     ]);
     $sth.execute($name);
     $sth.allrows(:array-of-hash);
