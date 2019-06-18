@@ -11,6 +11,13 @@ use POSIX ":sys_wait_h";
 my $msg = shift @ARGV // 'GO';
 
 my $zostayify_port = 10101;
+my $broadcast_addr = shift @ARGV;
+if (defined $broadcast_addr) {
+    $broadcast_addr = inet_aton($broadcast_addr);
+}
+else {
+    $broadcast_addr = INADDR_BROADCAST;
+}
 
 socket(my $udp, PF_INET, SOCK_DGRAM, getprotobyname("udp"))
     or die "Error: can't create an udp socket: $!\n";
@@ -19,7 +26,7 @@ my $orig = select($udp);
 $| = 1;
 select($orig);
 
-my $bc_addr = sockaddr_in($zostayify_port, INADDR_BROADCAST);
+my $bc_addr = sockaddr_in($zostayify_port, $broadcast_addr);
 setsockopt($udp, SOL_SOCKET, SO_BROADCAST, 1);
 
 send($udp, $msg, 0, $bc_addr)
