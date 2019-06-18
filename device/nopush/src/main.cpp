@@ -15,7 +15,7 @@ mysook::MC_Logger<Print> logger(micros, &Serial);
 mysook::MC_Network network(logger);
 mysook::MC_MDNS mdns("nopush-button", logger);
 
-NoPushButton nopush(logger, network, BUTTON_PIN, LIGHT_PIN);
+NoPushButton nopush(logger, network, mdns, BUTTON_PIN, LIGHT_PIN);
 
 void setup() {
     Serial.begin(9600);

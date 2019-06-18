@@ -25,6 +25,22 @@ const mysook::Color colors[] = {
     mysook::Color(255, 220, 0)  //! orange/yellow
 };
 
+void NameTagFlipper::handle_zostayification(String remote_ip, uint16_t remote_port, const char *buf, size_t len) {
+    if (len == 21) {
+        log.logf_ln("I [nametag] received zostayification signal");
+        flipper = FS_FLIP;
+    }
+    else if (len == 5) {
+        log.logf_ln("I [nametag] received zostayification reset");
+        flipper = FS_RESET;
+    }
+}
+
+void NameTag::handle_zostayification(String remote_ip, uint16_t remote_port, const char *buf, size_t len) {
+    log.logf_ln("I [nametag] incoming message");
+    flipper.handle_zostayification(remote_ip, remote_port, buf, len);
+}
+
 #define BRIGHTNESS 20
 
 void NameTag::start() {
@@ -66,9 +82,16 @@ void NameTag::tick() {
     }
 
     if (flipper.ready()) {
-        WebProgramInfo *binary = fetcher.next_program();
-        replace_program(binary);
-        flipper.reset();
+        if (flipper.signal() == FS_FLIP) {
+            WebProgramInfo *binary = fetcher.next_program();
+            replace_program(binary);
+            flipper.clear();
+        }
+        else if (flipper.signal() == FS_RESET) {
+            fetched = false;
+            flipper.clear();
+            this->remove_pre_ticker(&flipper);
+        }
     }
 
     if (vm->has_halted()) {

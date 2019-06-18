@@ -53,18 +53,19 @@ void NoPushButton::handle_button_press(bool pressed, unsigned long length) {
     }
 }
 
-void NoPushButton::broadcast_signal() {
-    logf_ln("I [nopush] Broadcast signal");
+void NoPushButton::broadcast(const char *message) {
     IPAddress broadcast(255, 255, 255, 255);
     udp.beginPacket(broadcast, ZOSTAYIFICATION_PORT);
-    udp.write("DONT PUSH THE BUTTON!");
+    udp.write(message);
     udp.endPacket();
+}
+
+void NoPushButton::broadcast_signal() {
+    logf_ln("I [nopush] Broadcast signal");
+    broadcast("DONT PUSH THE BUTTON!");
 }
 
 void NoPushButton::broadcast_reset() {
     logf_ln("I [nopush] Broadcast reset");
-    IPAddress broadcast(255, 255, 255, 255);
-    udp.beginPacket(broadcast, ZOSTAYIFICATION_PORT);
-    udp.write("RESET");
-    udp.endPacket();
+    broadcast("RESET");
 }

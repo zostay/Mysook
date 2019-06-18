@@ -18,8 +18,10 @@ class NoPushButton : public mysook::Firmware {
 private:
     mysook::ButtonDispatcher dispatcher = std::bind(&NoPushButton::handle_button_press, this, _1, _2);
 
+    void broadcast(const char *message);
+
 public:
-    NoPushButton(mysook::Logger &log, mysook::Network &network, int button_pin, int light_pin) : Firmware(log), network(network), button(button_pin, dispatcher), light(light_pin) { 
+    NoPushButton(mysook::Logger &log, mysook::Network &network, mysook::MC_MDNS &mdns, int button_pin, int light_pin) : Firmware(log), network(network), mdns(mdns), button(button_pin, dispatcher), light(light_pin) { 
         add_pre_ticker(&network);
         add_pre_ticker(&button);
         add_post_ticker(&light);
@@ -38,6 +40,7 @@ public:
 
 private:
     mysook::Network &network;
+    mysook::MC_MDNS &mdns;
     mysook::Button button;
     mysook::BlinkyLED light;
 
