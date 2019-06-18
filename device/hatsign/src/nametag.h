@@ -14,6 +14,7 @@
 
 #define PROGRAM_MAIN 1
 
+extern uint32_t PROGRAM_MAIN;
 extern uint32_t default_program[];
 
 class NameTagFlipper : public mysook::TickingVariableTimer {
