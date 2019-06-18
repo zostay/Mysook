@@ -21,6 +21,7 @@
 #define MAX_CONNECTION_MEMORY 10
 #define CONNECTION_TIMEOUT 30000000ul
 #define ANNOUNCEMENT_PERIOD 10000000ul
+#define FALLBACK_PERIOD 30000000ul
 
 using std::placeholders::_1;
 
@@ -46,6 +47,7 @@ protected:
 
     unsigned long timeout = 0;
     unsigned long last_announcement = 0;
+    unsigned long last_fallback = 0;
 
     bool scanning = false;
 
@@ -154,8 +156,13 @@ protected:
                 last_announcement = micros();
             }
 
-            int try_anyway_conn = rand() % conns;
+            int try_anyway_conn = 0;
             current = &memory[try_anyway_conn];
+
+            if (last_fallback + FALLBACK_PERIOD < micros()) {
+                begin_connection();
+                last_fallback = micros();
+            }
         }
 
         // A network was found, pick it and connect
