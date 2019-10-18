@@ -97,3 +97,23 @@ has Hash[Cofra::Web::View] $.views is constructed is construction-args(
 
 use TClock::Web::Router;
 has TClock::Web::Router $.router is constructed;
+
+has &.web-app is factory(anon method build-app {
+    my $web = $.web;
+
+    my &web-app = anon sub app(%env) {
+        start {
+            $web.p6wapi-request-response-dispatch(%env);
+        }
+    }
+
+    use Smack::Builder;
+    builder {
+        use Smack::Middleware::AccessLog;
+
+        enable Smack::Middleware::AccessLog;
+
+        &web-app;
+    }
+});
+
