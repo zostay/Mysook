@@ -9,6 +9,7 @@
 #include <Logger.h>
 #ifdef ESP8266
 #include <ESP8266WiFi.h>
+#include <ArduinoOTA.h>
 
 #define SYSTEM_EVENT_STA_CONNECTED    WIFI_EVENT_STAMODE_CONNECTED
 #define SYSTEM_EVENT_STA_GOT_IP       WIFI_EVENT_STAMODE_GOT_IP
@@ -53,6 +54,7 @@ protected:
 
 #ifdef ESP8266
     bool listening = false;
+    const char *ota_enabled = 0;
 #else//ESP8266
     WiFiEventId_t listener_id = 0;
 #endif//ESP8266
@@ -68,6 +70,12 @@ protected:
         switch (event) {
             case SYSTEM_EVENT_STA_CONNECTED:
                 logger.logf_ln("I [network] Connected %s", current->ssid);
+#ifdef ESP8266
+                if (ota_enabled) {
+                    ArduinoOTA.setHostname(ota_enabled);
+                    ArduinoOTA.begin();
+                }
+#endif//ESP8266
                 break;
 
             case SYSTEM_EVENT_STA_GOT_IP:
@@ -215,6 +223,10 @@ public:
 
     virtual bool connecting() { return should_connect && !connect_status; }
     virtual bool connected() { return connect_status; }
+
+#ifdef ESP8266
+    void enable_ota(const char *hostname) { ota_enabled = hostname; }
+#endif//ESP8266
 
     virtual uint8_t signal_strength() {
         long base_value = WiFi.RSSI();
