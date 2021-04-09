@@ -1,0 +1,807 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<title>~/Documents/code/0/Mysook/device/hatsign/src/vm.h.html</title>
+<meta name="Generator" content="Vim/8.0">
+<meta name="plugin-version" content="vim7.4_v2">
+<meta name="syntax" content="cpp">
+<meta name="settings" content="use_css,no_foldcolumn,expand_tabs,prevent_copy=">
+<meta name="colorscheme" content="desert256">
+<style type="text/css">
+<!--
+pre { font-family: monospace; color: #c6c6c6; background-color: #000000; }
+body { font-family: monospace; color: #c6c6c6; background-color: #000000; }
+* { font-size: 1em; }
+.Type { color: #afaf5f; font-weight: bold; }
+.Comment { color: #87d7ff; }
+.Constant { color: #ffafaf; }
+.Special { color: #ffd7af; }
+.Statement { color: #ffd787; font-weight: bold; }
+.PreProc { color: #d75f5f; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="PreProc">#ifndef __VM_H</span>
+<span class="PreProc">#define __VM_H</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;map&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdexcept&gt;</span>
+
+<span class="PreProc">#include </span><span class="Constant">&lt;Color.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;Firmware.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;Logger.h&gt;</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;Panel.h&gt;</span>
+
+<span class="PreProc">#include </span><span class="Constant">&quot;ops.h&quot;</span>
+<span class="PreProc">#include </span><span class="Constant">&quot;TomThumb.h&quot;</span>
+
+<span class="PreProc">#ifndef ARDUINO</span>
+<span class="PreProc">#include </span><span class="Constant">&lt;stdlib.h&gt;</span>
+<span class="PreProc">#endif</span><span class="Comment">//ARDUINO</span>
+
+<span class="PreProc">#define MAX_TIME_SLICE </span><span class="Constant">50000ul</span>
+
+<span class="PreProc">#define STACK_SIZE </span><span class="Constant">4096</span>
+<span class="PreProc">#define HEAP_SIZE  </span><span class="Constant">256</span>
+
+<span class="PreProc">#define PANEL_WIDTH </span><span class="Constant">12</span>
+<span class="PreProc">#define PANEL_HEIGHT </span><span class="Constant">6</span>
+
+<span class="PreProc">#define MAX_BRIGHTNESS </span><span class="Constant">75</span>
+
+<span class="Comment">//#define ENABLE_VM_DEBUGGING</span>
+
+<span class="PreProc">#ifdef ENABLE_VM_DEBUGGING</span>
+<span class="PreProc">#define DEBUG(fmt, ...) log.logf_ln(fmt, </span><span class="Constant">__VA_ARGS__</span><span class="PreProc">)</span>
+<span class="PreProc">#define TRACE(fmt, ...) log.logf_ln(fmt, </span><span class="Constant">__VA_ARGS__</span><span class="PreProc">)</span>
+<span class="PreProc">#else</span>
+<span class="PreProc">#define DEBUG(fmt, ...)</span>
+<span class="PreProc">#define TRACE(fmd, ...)</span>
+<span class="PreProc">#endif</span>
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+<span class="Type">void</span> op_mask_columns(VM&lt;W,H&gt; &amp;);
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+<span class="Type">void</span> op_mask_rows(VM&lt;W,H&gt; &amp;);
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+<span class="Type">class</span> VM : <span class="Statement">public</span> mysook::RGBPanelGrid&lt;W, H&gt;, <span class="Statement">public</span> mysook::TickingVariableTimer {
+<span class="Statement">protected</span>:
+    <span class="Type">const</span> <span class="Type">uint32_t</span> *program;
+    <span class="Type">uint32_t</span> stack[STACK_SIZE];
+    <span class="Type">uint32_t</span> registers[HEAP_SIZE];
+
+    std::map&lt;<span class="Type">uint32_t</span>, <span class="Type">int</span>&gt; call_index;
+    OpCodes&lt;W,H&gt; op_codes;
+
+    mysook::Logger &amp;log;
+    mysook::RGBPanel&lt;W, H&gt; &amp;panel;
+    <span class="Type">uint32_t</span> _panel_bitmask[H];
+
+    <span class="Type">int</span> _start;
+
+    <span class="Type">int</span> max_ptr = <span class="Constant">0</span>;
+    <span class="Type">int</span> program_ptr = <span class="Constant">0</span>;
+    <span class="Type">int</span> stack_ptr = <span class="Constant">0</span>;
+
+    <span class="Type">int</span> _tick = <span class="Constant">0</span>;
+
+    <span class="Type">void</span> scan_subs();
+
+    <span class="Type">bool</span> halted = <span class="Constant">false</span>;
+
+    <span class="Statement">friend</span> <span class="Type">void</span> op_halt&lt;W,H&gt;(VM&lt;W,H&gt; &amp;);
+    <span class="Statement">friend</span> <span class="Type">void</span> op_mask_rows&lt;W,H&gt;(VM&lt;W,H&gt; &amp;);
+    <span class="Statement">friend</span> <span class="Type">void</span> op_mask_bits&lt;W,H&gt;(VM&lt;W,H&gt; &amp;);
+
+    <span class="Type">unsigned</span> <span class="Type">long</span> hertz(<span class="Type">uint32_t</span> urgency) { <span class="Statement">return</span> <span class="Constant">50000ul</span> * urgency; }
+    <span class="Type">unsigned</span> <span class="Type">long</span> _tick_speed = <span class="Constant">50000ul</span>;
+
+<span class="Statement">public</span>:
+    VM(mysook::Logger &amp;log, mysook::RGBPanel&lt;W, H&gt; &amp;panel, <span class="Type">const</span> <span class="Type">uint32_t</span> *program, <span class="Type">uint32_t</span> start);
+
+    <span class="Type">const</span> <span class="Type">int</span> width() <span class="Type">const</span> { <span class="Statement">return</span> W; }
+    <span class="Type">const</span> <span class="Type">int</span> height() <span class="Type">const</span> { <span class="Statement">return</span> H; }
+
+    <span class="Type">void</span> begin();
+
+    <span class="Type">virtual</span> <span class="Type">unsigned</span> <span class="Type">long</span> tick_speed() { <span class="Statement">return</span> _tick_speed; }
+    <span class="Type">virtual</span> <span class="Type">void</span> tick() { tick_exec(); }
+
+    <span class="Type">uint32_t</span> pop();
+    <span class="Type">void</span> push(<span class="Type">uint32_t</span> v);
+
+    <span class="Type">void</span> halt() {
+        log.logf_ln(<span class="Constant">&quot;W [vm] &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt; HALT!&quot;</span>, program_ptr);
+        halted = <span class="Constant">true</span>;
+    }
+
+    <span class="Type">bool</span> has_halted() { <span class="Statement">return</span> halted; }
+
+    <span class="Type">int</span> get_sub(<span class="Type">uint32_t</span> sub) {
+        <span class="Statement">try</span> {
+            <span class="Statement">return</span> call_index.at(sub);
+        }
+        <span class="Statement">catch</span> (std::out_of_range e) {
+            <span class="Statement">return</span> <span class="Constant">0</span>;
+        }
+    }
+
+    <span class="Type">uint32_t</span> step() {
+        <span class="Statement">if</span> (halted) <span class="Statement">return</span> OP_HALT;
+        <span class="Statement">return</span> program[ program_ptr++ ];
+    }
+
+    <span class="Type">uint32_t</span> peek_step() {
+        <span class="Statement">if</span> (halted) <span class="Statement">return</span> OP_HALT;
+        <span class="Statement">return</span> program[ program_ptr ];
+    }
+
+    <span class="Type">void</span> step_exec();
+    <span class="Type">void</span> tick_exec();
+
+    <span class="Type">void</span> jump_sub(<span class="Type">int</span> new_program_ptr) {
+        TRACE(<span class="Constant">&quot;T [vm] JUMP &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt;&quot;</span>, new_program_ptr);
+        DEBUG(<span class="Constant">&quot;D [vm] save &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt;&quot;</span>, program_ptr);
+        push(program_ptr);
+        push(get_register(REG_STACK_SEGMENT));
+        set_register(REG_STACK_SEGMENT, stack_ptr);
+        jump(new_program_ptr);
+    }
+
+    <span class="Type">void</span> return_sub() {
+        <span class="Type">int</span> new_stack_ptr = get_register(REG_STACK_SEGMENT);
+        <span class="Type">int</span> return_ptr = read_stack(new_stack_ptr - <span class="Constant">2</span>);
+        <span class="Type">uint32_t</span> segment_ptr = read_stack(new_stack_ptr - <span class="Constant">1</span>);
+
+        TRACE(<span class="Constant">&quot;T [vm] RETURN &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt; TO &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt; STACK </span><span class="Special">%d</span><span class="Constant"> SS </span><span class="Special">%lu</span><span class="Constant">&quot;</span>, program_ptr, return_ptr, stack_ptr, segment_ptr);
+
+        stack_ptr = new_stack_ptr - <span class="Constant">2</span>;
+        jump(return_ptr);
+        set_register(REG_STACK_SEGMENT, segment_ptr);
+    }
+
+    <span class="Type">void</span> jump(<span class="Type">int</span> new_program_ptr) {
+        <span class="Statement">if</span> (new_program_ptr &gt; max_ptr || new_program_ptr &lt; <span class="Constant">0</span>) {
+            <span class="Comment">// PANIC!</span>
+            log.logf_ln(<span class="Constant">&quot;E [vm] jump &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt; is out of the program (max &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt;)&quot;</span>, new_program_ptr, max_ptr);
+            halt();
+            <span class="Statement">return</span>;
+        }
+
+        DEBUG(<span class="Constant">&quot;D [vm] jump &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt;&quot;</span>, new_program_ptr);
+        program_ptr = new_program_ptr;
+    }
+
+    <span class="Type">void</span> reset_tick() { _tick = <span class="Constant">0</span>; }
+    <span class="Type">void</span> next_tick() { _tick++; draw(); }
+    <span class="Type">bool</span> has_ticked() { <span class="Statement">return</span> _tick; }
+
+    <span class="Type">uint32_t</span> get_register(<span class="Type">int</span> reg) {
+        <span class="Statement">if</span> (reg &lt; <span class="Constant">0</span> || reg &gt;= HEAP_SIZE) {
+            <span class="Comment">// PANIC!</span>
+            log.logf_ln(<span class="Constant">&quot;E [vm] get illegal register </span><span class="Special">%d</span><span class="Constant">&quot;</span>, reg);
+            halt();
+            <span class="Statement">return</span> <span class="Constant">0</span>;
+        }
+
+        DEBUG(<span class="Constant">&quot;D [vm] get register </span><span class="Special">%d</span><span class="Constant"> -&gt; </span><span class="Special">%d</span><span class="Constant">&quot;</span>, reg, registers[reg]);
+
+        <span class="Statement">return</span> registers[reg];
+    }
+
+    <span class="Type">void</span> set_register(<span class="Type">int</span> reg, <span class="Type">uint32_t</span> val) {
+        <span class="Statement">if</span> (reg &lt; <span class="Constant">0</span> || reg &gt;= HEAP_SIZE) {
+            <span class="Comment">// PANIC!</span>
+            log.logf_ln(<span class="Constant">&quot;E [vm] set illegal register </span><span class="Special">%d</span><span class="Constant">&quot;</span>, reg);
+            halt();
+            <span class="Statement">return</span>;
+        }
+
+        DEBUG(<span class="Constant">&quot;D [vm] set register </span><span class="Special">%d</span><span class="Constant"> &lt;- </span><span class="Special">%u</span><span class="Constant">&quot;</span>, reg, val);
+        registers[reg] = val;
+
+        <span class="Statement">switch</span> (reg) {
+        <span class="Statement">case</span> REG_URGENCY:
+            _tick_speed = hertz(val);
+            <span class="Statement">this</span>-&gt;nudge_tick();
+            <span class="Comment">//log.logf_ln(&quot;I [vm] tick_speed = %ld&quot;, _tick_speed);</span>
+            <span class="Statement">break</span>;
+
+        <span class="Statement">case</span> REG_BRIGHTNESS:
+            {
+                <span class="Type">uint8_t</span> capped = val &gt; MAX_BRIGHTNESS ? MAX_BRIGHTNESS : val;
+                set_brightness(capped);
+            }
+            <span class="Statement">break</span>;
+
+        <span class="Statement">case</span> REG_FOREGROUND_COLOR:
+            <span class="Statement">this</span>-&gt;set_fg(get_register_color(REG_FOREGROUND_COLOR));
+            <span class="Statement">break</span>;
+
+        <span class="Statement">case</span> REG_BACKGROUND_COLOR:
+            <span class="Statement">this</span>-&gt;set_bg(get_register_color(REG_BACKGROUND_COLOR));
+            <span class="Statement">break</span>;
+
+        <span class="Statement">case</span> REG_STACK_SEGMENT:
+            <span class="Statement">if</span> (val &gt;= STACK_SIZE) {
+                <span class="Comment">// PANIC!</span>
+                log.logf_ln(<span class="Constant">&quot;E [vm] invalid stack segment </span><span class="Special">%u</span><span class="Constant">&quot;</span>, val);
+                halt();
+            };
+            <span class="Statement">break</span>;
+
+        <span class="Statement">case</span> REG_CURSOR_X:
+            <span class="Statement">this</span>-&gt;mysook::RGBPanel&lt;W,H&gt;::set_cursor(val, get_register(REG_CURSOR_Y));
+            <span class="Statement">break</span>;
+
+        <span class="Statement">case</span> REG_CURSOR_Y:
+            <span class="Statement">this</span>-&gt;mysook::RGBPanel&lt;W,H&gt;::set_cursor(get_register(REG_CURSOR_X), val);
+            <span class="Statement">break</span>;
+        }
+    }
+
+    mysook::Color get_register_color(<span class="Type">int</span> reg);
+    <span class="Type">void</span> set_register_color(<span class="Type">int</span> reg, mysook::Color val);
+
+    <span class="Type">void</span> clear_bitmask() {
+        <span class="Statement">for</span> (<span class="Type">int</span> bmp = <span class="Constant">0</span>; bmp &lt; H; ++bmp) {
+            _panel_bitmask[bmp] = <span class="Constant">0</span>;
+        }
+    }
+
+    <span class="Type">void</span> fill_bitmask() {
+        <span class="Statement">for</span> (<span class="Type">int</span> bmp = <span class="Constant">0</span>; bmp &lt; H; ++bmp) {
+            _panel_bitmask[bmp] = (<span class="Constant">0x01</span> &lt;&lt; W) - <span class="Constant">1</span>;
+        }
+    }
+
+    <span class="Type">void</span> apply_column_mask(<span class="Type">uint32_t</span> mask);
+
+    <span class="Type">uint32_t</span> read_stack(<span class="Type">int</span> stack_ptr) {
+        <span class="Statement">if</span> (stack_ptr &lt; <span class="Constant">0</span> || stack_ptr &gt;= STACK_SIZE) {
+            <span class="Comment">// PANIC!</span>
+            log.logf_ln(<span class="Constant">&quot;E [vm] &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt; segmentation fault reading </span><span class="Special">%d</span><span class="Constant">&quot;</span>, program_ptr, stack_ptr);
+            halt();
+            <span class="Statement">return</span> <span class="Constant">0</span>;
+        }
+
+        TRACE(<span class="Constant">&quot;T [vm] &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt; READ </span><span class="Special">%d</span><span class="Constant"> -&gt; </span><span class="Special">%d</span><span class="Constant">&quot;</span>, program_ptr, stack_ptr, stack[stack_ptr]);
+        <span class="Statement">return</span> stack[stack_ptr];
+    }
+
+    <span class="Type">void</span> write_stack(<span class="Type">int</span> stack_ptr, <span class="Type">uint32_t</span> val) {
+        <span class="Statement">if</span> (stack_ptr &lt; <span class="Constant">0</span> || stack_ptr &gt;= STACK_SIZE) {
+            <span class="Comment">// PANIC!</span>
+            log.logf_ln(<span class="Constant">&quot;E [vm] &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt; segmentation fault writing </span><span class="Special">%d</span><span class="Constant">&quot;</span>, program_ptr, stack_ptr);
+            halt();
+            <span class="Statement">return</span>;
+        }
+
+        TRACE(<span class="Constant">&quot;T [vm] &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt; WRITE </span><span class="Special">%d</span><span class="Constant"> &lt;- </span><span class="Special">%d</span><span class="Constant">&quot;</span>, program_ptr, stack_ptr, val);
+        stack[stack_ptr] = val;
+    }
+
+    <span class="Type">void</span> allocate_stack(<span class="Type">int</span> amount, <span class="Type">uint32_t</span> initializer) {
+        <span class="Statement">for</span> (<span class="Type">int</span> i = <span class="Constant">0</span>; i &lt; amount; ++i) {
+            push(initializer);
+        }
+    }
+
+<span class="Statement">public</span>:
+    <span class="Statement">using</span> mysook::RGBPanelGrid&lt;W,H&gt;::put_pixel;
+    <span class="Statement">using</span> mysook::RGBPanelGrid&lt;W,H&gt;::fill_screen;
+    <span class="Statement">using</span> mysook::RGBPanelGrid&lt;W,H&gt;::put_char;
+    <span class="Statement">using</span> mysook::RGBPanelGrid&lt;W,H&gt;::put_text;
+
+    <span class="Statement">using</span> mysook::RGBPanelGrid&lt;W,H&gt;::set_fg;
+    <span class="Statement">using</span> mysook::RGBPanelGrid&lt;W,H&gt;::set_bg;
+    <span class="Statement">using</span> mysook::RGBPanelGrid&lt;W,H&gt;::set_brightness;
+
+    <span class="Type">virtual</span> <span class="Type">void</span> set_cursor(<span class="Type">int</span> x, <span class="Type">int</span> y) {
+        mysook::RGBPanel&lt;W,H&gt;::set_cursor(x, y);
+        set_register(REG_CURSOR_X, x);
+        set_register(REG_CURSOR_Y, y);
+    }
+
+    <span class="Type">virtual</span> <span class="Type">void</span> draw();
+};
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+VM&lt;W,H&gt;::VM(mysook::Logger &amp;log, mysook::RGBPanel&lt;W,H&gt; &amp;panel, <span class="Type">const</span> <span class="Type">uint32_t</span> *program, <span class="Type">uint32_t</span> start)
+: log(log), panel(panel), program(program), _start(start) { }
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+<span class="Type">void</span> VM&lt;W,H&gt;::begin() {
+    <span class="Statement">this</span>-&gt;grid.setFont(&amp;TomThumb);
+    <span class="Statement">this</span>-&gt;grid.setTextWrap(<span class="Constant">false</span>);
+
+    halted = <span class="Constant">false</span>;
+
+    call_index.clear();
+
+    scan_subs();
+
+    program_ptr = get_sub(_start);
+    stack_ptr = <span class="Constant">0</span>;
+
+    log.logf_ln(<span class="Constant">&quot;I [vm] &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt; Starting VM at sub </span><span class="Special">%u</span><span class="Constant">&quot;</span>, program_ptr, _start);
+
+    fill_bitmask();
+
+    registers[REG_TICK_MODE]        = MODE_NONE;
+
+    registers[REG_URGENCY]          = <span class="Constant">10</span>;
+    registers[REG_BRIGHTNESS]       = <span class="Constant">30</span>;
+
+    _tick_speed = hertz(<span class="Constant">10</span>);
+    set_brightness(<span class="Constant">30</span>);
+
+    registers[REG_FOREGROUND_COLOR] = <span class="Constant">0xFFFFFF</span>; <span class="Comment">// white</span>
+    registers[REG_BACKGROUND_COLOR] = <span class="Constant">0x000000</span>; <span class="Comment">// black</span>
+    registers[REG_MASKGROUND_COLOR] = <span class="Constant">0x000000</span>; <span class="Comment">// black</span>
+
+    set_fg(mysook::Color(<span class="Constant">255</span>, <span class="Constant">255</span>, <span class="Constant">255</span>));
+    set_bg(mysook::Color(<span class="Constant">0</span>, <span class="Constant">0</span>, <span class="Constant">0</span>));
+
+    <span class="Comment">// Make it so OP_RETURN in main will halt</span>
+    push(max_ptr - <span class="Constant">1</span>);
+    push(<span class="Constant">0</span>);
+
+    registers[REG_STACK_SEGMENT]    = stack_ptr;
+    registers[REG_MARK]             = stack_ptr;
+
+}
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+<span class="Type">void</span> VM&lt;W,H&gt;::scan_subs() {
+    <span class="Type">int</span> i = <span class="Constant">0</span>;
+    <span class="Statement">while</span> (program[i] != OP_HALT) {
+        <span class="Statement">if</span> (program[i] == OP_SUB) {
+            log.logf_ln(<span class="Constant">&quot;I [vm] call_index </span><span class="Special">%d</span><span class="Constant"> -&gt; &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt;&quot;</span>, program[i + <span class="Constant">1</span>], i);
+            call_index[ program[i + <span class="Constant">1</span>] ] = i;
+        }
+
+        <span class="Statement">switch</span> (program[i]) {
+        <span class="Statement">case</span> OP_PUSH:
+        <span class="Statement">case</span> OP_SUB:
+            i += <span class="Constant">2</span>;
+            <span class="Statement">break</span>;
+
+        <span class="Statement">default</span>:
+            ++i;
+        }
+    }
+
+    max_ptr = i;
+}
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+<span class="Type">void</span> VM&lt;W,H&gt;::step_exec() {
+    <span class="Statement">if</span> (halted) <span class="Statement">return</span>;
+
+    <span class="Type">uint32_t</span> mode = get_register(REG_TICK_MODE);
+
+    <span class="Type">auto</span> tick_mode_op = op_codes.at(OP_TICK);
+    <span class="Type">bool</span> in_tick_mode = <span class="Constant">false</span>;
+
+    <span class="Statement">switch</span> (mode) {
+    <span class="Statement">case</span> MODE_NONE:
+        {
+            <span class="Type">uint32_t</span> s = step();
+
+            <span class="Comment">//if (s == OP_PUSH || s == OP_SUB) {</span>
+            <span class="Comment">//    log.logf_ln(&quot;T [vm] &lt;PP:%08X&gt; EXEC %08X %08X&quot;, program_ptr, s, peek_step());</span>
+            <span class="Comment">//}</span>
+            <span class="Comment">//else {</span>
+            <span class="Comment">//    log.logf_ln(&quot;T [vm] &lt;PP:%08X&gt; EXEC %08X&quot;, program_ptr, s);</span>
+            <span class="Comment">//}</span>
+
+            <span class="Statement">try</span> {
+                <span class="Type">auto</span> op_code = op_codes.at(s);
+                op_code(*<span class="Statement">this</span>);
+            }
+            <span class="Statement">catch</span> (std::out_of_range e) {
+                <span class="Comment">// PANIC!</span>
+                log.logf_ln(<span class="Constant">&quot;E [vm] &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt; invalid opcode </span><span class="Special">%d</span><span class="Constant">&quot;</span>, program_ptr, s);
+                halt();
+            }
+        }
+        <span class="Statement">break</span>;
+
+    <span class="Statement">case</span> MODE_BRIGHTNESS:
+        in_tick_mode = <span class="Constant">true</span>;
+        tick_mode_op = op_codes.at(OP_BRIGHTNESS);
+        TRACE(<span class="Constant">&quot;T [vm] &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt; EXEC </span><span class="Special">%08X</span><span class="Constant">&quot;</span>, program_ptr, OP_BRIGHTNESS);
+        <span class="Statement">break</span>;
+
+    <span class="Statement">case</span> MODE_MASK_ROWS:
+        in_tick_mode = <span class="Constant">true</span>;
+        tick_mode_op = op_codes.at(OP_MASK_ROWS);
+        TRACE(<span class="Constant">&quot;T [vm] &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt; EXEC </span><span class="Special">%08X</span><span class="Constant">&quot;</span>, program_ptr, OP_MASK_ROWS);
+        <span class="Statement">break</span>;
+
+    <span class="Statement">case</span> MODE_MASK_COLUMNS:
+        in_tick_mode = <span class="Constant">true</span>;
+        tick_mode_op = op_codes.at(OP_MASK_COLUMNS);
+        TRACE(<span class="Constant">&quot;T [vm] &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt; EXEC </span><span class="Special">%08X</span><span class="Constant">&quot;</span>, program_ptr, OP_MASK_COLUMNS);
+        <span class="Statement">break</span>;
+
+    <span class="Statement">case</span> MODE_MASK_BITS:
+        in_tick_mode = <span class="Constant">true</span>;
+        tick_mode_op = op_codes.at(OP_MASK_BITS);
+        TRACE(<span class="Constant">&quot;T [vm] &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt; EXEC </span><span class="Special">%08X</span><span class="Constant">&quot;</span>, program_ptr, OP_MASK_BITS);
+        <span class="Statement">break</span>;
+
+    <span class="Statement">default</span>:
+        <span class="Comment">// PANIC!</span>
+        log.logf_ln(<span class="Constant">&quot;E [vm] invalid tick mode </span><span class="Special">%08x</span><span class="Constant">&quot;</span>, mode);
+        halt();
+        <span class="Statement">return</span>;
+    }
+
+    <span class="Statement">if</span> (in_tick_mode) {
+        <span class="Statement">if</span> (get_register(REG_MARK) &gt; <span class="Constant">0</span>) {
+            tick_mode_op(*<span class="Statement">this</span>);
+            next_tick();
+        }
+        <span class="Statement">else</span> {
+            set_register(REG_TICK_MODE, MODE_NONE);
+        }
+    }
+
+    <span class="Comment">//String stack_str;</span>
+    <span class="Comment">//bool first = true;</span>
+    <span class="Comment">//for (int i = 0; i &lt; stack_ptr; ++i) {</span>
+    <span class="Comment">//    if (!first) stack_str += &quot;, &quot;;</span>
+    <span class="Comment">//    stack_str += String(stack[i]);</span>
+    <span class="Comment">//    first = false;</span>
+    <span class="Comment">//}</span>
+    <span class="Comment">//TRACE(&quot;T [vm] &lt;PP:%08X&gt; STACK: %s&quot;, stack_str.c_str());</span>
+}
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+<span class="Type">void</span> VM&lt;W,H&gt;::tick_exec() {
+    <span class="Statement">if</span> (halted) <span class="Statement">return</span>;
+
+    reset_tick();
+    <span class="Type">unsigned</span> <span class="Type">long</span> tick_start = mysook::get_micros();
+    <span class="Statement">while</span> (!has_ticked() &amp;&amp; !has_halted()) {
+        step_exec();
+
+        <span class="Comment">// a tick is only permitted to be MAX_TIME_SLICE long</span>
+        <span class="Statement">if</span> (tick_start + MAX_TIME_SLICE &lt; mysook::get_micros()) {
+            log.logf_ln(<span class="Constant">&quot;W [vm] &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt; Skipping tick: the program took too long.&quot;</span>, program_ptr);
+            <span class="Statement">break</span>;
+        }
+    }
+
+    <span class="Comment">//log.logf_ln(&quot;I [vm] Tick!&quot;);</span>
+}
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+<span class="Type">uint32_t</span> VM&lt;W,H&gt;::pop() {
+    <span class="Statement">if</span> (stack_ptr &lt;= <span class="Constant">0</span>) {
+        <span class="Comment">// PANIC!</span>
+        log.logf_ln(<span class="Constant">&quot;E [vm] stack underflow&quot;</span>);
+        halt();
+        <span class="Statement">return</span> <span class="Constant">0</span>;
+    }
+    <span class="Statement">else</span> {
+        registers[REG_MARK]--;
+        TRACE(<span class="Constant">&quot;T [vm] &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt; POP </span><span class="Special">%08X</span><span class="Constant">&quot;</span>, program_ptr, stack[ stack_ptr - <span class="Constant">1</span> ]);
+        <span class="Statement">return</span> stack[ --stack_ptr ];
+    }
+}
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+<span class="Type">void</span> VM&lt;W,H&gt;::push(<span class="Type">uint32_t</span> v) {
+    <span class="Statement">if</span> (stack_ptr &gt;= STACK_SIZE) {
+        <span class="Comment">// PANIC!</span>
+        log.logf_ln(<span class="Constant">&quot;E [vm] stack overflow&quot;</span>);
+        halt();
+    }
+    <span class="Statement">else</span> {
+        registers[REG_MARK]++;
+        TRACE(<span class="Constant">&quot;T [vm] &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt; PUSH </span><span class="Special">%08X</span><span class="Constant">&quot;</span>, program_ptr, v);
+        stack[ stack_ptr++ ] = v;
+    }
+}
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+mysook::Color VM&lt;W,H&gt;::get_register_color(<span class="Type">int</span> reg) {
+    <span class="Statement">if</span> (reg &lt; <span class="Constant">0</span> || reg &gt;= HEAP_SIZE) {
+        <span class="Comment">// PANIC!</span>
+        log.logf_ln(<span class="Constant">&quot;E [vm] get illegal color register </span><span class="Special">%d</span><span class="Constant">&quot;</span>, reg);
+        halt();
+        <span class="Statement">return</span> mysook::Color(<span class="Constant">0</span>, <span class="Constant">0</span>, <span class="Constant">0</span>);
+    }
+
+    mysook::Color color(registers[reg]);
+
+    DEBUG(<span class="Constant">&quot;D [vm] 0x</span><span class="Special">%06X</span><span class="Constant"> -&gt; (</span><span class="Special">%d</span><span class="Constant">, </span><span class="Special">%d</span><span class="Constant">, </span><span class="Special">%d</span><span class="Constant">)&quot;</span>, registers[reg], color.r, color.g, color.b);
+
+    <span class="Statement">return</span> color;
+}
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+<span class="Type">void</span> VM&lt;W,H&gt;::set_register_color(<span class="Type">int</span> reg, mysook::Color val) {
+    <span class="Statement">if</span> (reg &lt; <span class="Constant">0</span> || reg &gt;= HEAP_SIZE) {
+        <span class="Comment">// PANIC!</span>
+        log.logf_ln(<span class="Constant">&quot;E [vm] set illegal color register </span><span class="Special">%d</span><span class="Constant">&quot;</span>, reg);
+        halt();
+        <span class="Statement">return</span>;
+    }
+
+    DEBUG(<span class="Constant">&quot;D [vm] (</span><span class="Special">%d</span><span class="Constant">, </span><span class="Special">%d</span><span class="Constant">, </span><span class="Special">%d</span><span class="Constant">) -&gt; 0x</span><span class="Special">%06X</span><span class="Constant">&quot;</span>, val.r, val.g, val.b, val.truecolor());
+
+    set_register(reg, val.truecolor());
+}
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+<span class="Type">void</span> VM&lt;W,H&gt;::apply_column_mask(<span class="Type">uint32_t</span> mask) {
+    DEBUG(<span class="Constant">&quot;D [vm] &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt; COLUMN MASK </span><span class="Special">%08X</span><span class="Constant">&quot;</span>, program_ptr, mask);
+
+    clear_bitmask();
+
+    <span class="Type">uint32_t</span> bit_mask = <span class="Constant">0x01u</span> &lt;&lt; (W - <span class="Constant">1</span>);
+    <span class="Statement">for</span> (<span class="Type">int</span> x = <span class="Constant">0</span>; x &lt; W; ++x) {
+        <span class="Type">uint32_t</span> sel_mask = bit_mask &gt;&gt; x;
+        <span class="Type">uint32_t</span> col_mask = mask &amp; sel_mask;
+
+        DEBUG(<span class="Constant">&quot;D [vm] &lt;PP:</span><span class="Special">%08X</span><span class="Constant">&gt; SET BIT </span><span class="Special">%08X</span><span class="Constant">&quot;</span>, program_ptr, col_mask);
+
+        <span class="Statement">for</span> (<span class="Type">int</span> mp = <span class="Constant">0</span>; mp &lt; H; ++mp) _panel_bitmask[mp] |= col_mask;
+    }
+}
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+<span class="Type">void</span> VM&lt;W,H&gt;::draw() {
+    <span class="Type">uint32_t</span> *buf = <span class="Statement">this</span>-&gt;get_buffer();
+    mysook::Color mask_color = get_register_color(REG_MASKGROUND_COLOR);
+
+    <span class="Type">int</span> i = <span class="Constant">0</span>;
+    <span class="Type">uint32_t</span> base_mask = <span class="Constant">0x01</span> &lt;&lt; (W - <span class="Constant">1</span>);
+    <span class="Statement">for</span> (<span class="Type">int</span> y = <span class="Constant">0</span>; y &lt; H; y++) {
+        <span class="Type">uint32_t</span> row_mask = _panel_bitmask[y];
+        DEBUG(<span class="Constant">&quot;D [vm] row </span><span class="Special">%d</span><span class="Constant"> mask 0x</span><span class="Special">%03X</span><span class="Constant">&quot;</span>, y, row_mask);
+
+        <span class="Statement">for</span> (<span class="Type">int</span> x = <span class="Constant">0</span>; x &lt; W; x++) {
+            <span class="Type">uint32_t</span> bit_mask = base_mask &gt;&gt; x;
+            DEBUG(<span class="Constant">&quot;D [vm] bit </span><span class="Special">%d</span><span class="Constant"> mask 0x</span><span class="Special">%03X</span><span class="Constant">&quot;</span>, x, bit_mask);
+
+            <span class="Statement">if</span> (bit_mask &amp; row_mask) {
+                mysook::Color c(buf[i]);
+                DEBUG(<span class="Constant">&quot;D [vm] unmasking (</span><span class="Special">%d</span><span class="Constant">, </span><span class="Special">%d</span><span class="Constant">) &lt;- (</span><span class="Special">%d</span><span class="Constant">, </span><span class="Special">%d</span><span class="Constant">, </span><span class="Special">%d</span><span class="Constant">)&quot;</span>, x, y, c.r, c.g, c.b);
+                panel.put_pixel(x, y, c);
+            }
+            <span class="Statement">else</span> {
+                DEBUG(<span class="Constant">&quot;D [vm] masking (</span><span class="Special">%d</span><span class="Constant">, </span><span class="Special">%d</span><span class="Constant">)&quot;</span>, x, y);
+                panel.put_pixel(x, y, mask_color);
+            }
+
+            ++i;
+        }
+    }
+
+    panel.set_brightness(<span class="Statement">this</span>-&gt;brightness &gt; MAX_BRIGHTNESS ? MAX_BRIGHTNESS : <span class="Statement">this</span>-&gt;brightness);
+    delay(<span class="Constant">1</span>); <span class="Comment">// See <a href="https://github.com/adafruit/Adafruit_NeoPixel/issues/139">https://github.com/adafruit/Adafruit_NeoPixel/issues/139</a></span>
+    panel.draw();
+}
+
+<span class="PreProc">#define OP_BINARY_EXPR(name, op) \</span>
+<span class="Type">template</span><span class="PreProc"> &lt;</span><span class="Type">int</span><span class="PreProc"> W, </span><span class="Type">int</span><span class="PreProc"> H&gt; \</span>
+<span class="Type">void</span><span class="PreProc"> op_##name(VM&lt;W,H&gt; &amp;p) { \</span>
+<span class="PreProc">    </span><span class="Type">uint32_t</span><span class="PreProc"> a = p.pop(); \</span>
+<span class="PreProc">    </span><span class="Type">uint32_t</span><span class="PreProc"> b = p.pop(); \</span>
+<span class="PreProc">    </span><span class="Type">uint32_t</span><span class="PreProc"> r = op; \</span>
+<span class="PreProc">    p.push(r); \</span>
+<span class="PreProc">}</span>
+
+<span class="PreProc">#define OP_BINARY_STMT(name, op) \</span>
+<span class="Type">template</span><span class="PreProc"> &lt;</span><span class="Type">int</span><span class="PreProc"> W, </span><span class="Type">int</span><span class="PreProc"> H&gt; \</span>
+<span class="Type">void</span><span class="PreProc"> op_##name(VM&lt;W,H&gt; &amp;p) { \</span>
+<span class="PreProc">    </span><span class="Type">uint32_t</span><span class="PreProc"> a = p.pop(); \</span>
+<span class="PreProc">    </span><span class="Type">uint32_t</span><span class="PreProc"> b = p.pop(); \</span>
+<span class="PreProc">    op; \</span>
+<span class="PreProc">}</span>
+
+<span class="PreProc">#define OP_UNARY_EXPR(name, op) \</span>
+<span class="Type">template</span><span class="PreProc"> &lt;</span><span class="Type">int</span><span class="PreProc"> W, </span><span class="Type">int</span><span class="PreProc"> H&gt; \</span>
+<span class="Type">void</span><span class="PreProc"> op_##name(VM&lt;W,H&gt; &amp;p) { \</span>
+<span class="PreProc">    </span><span class="Type">uint32_t</span><span class="PreProc"> a = p.pop(); \</span>
+<span class="PreProc">    </span><span class="Type">uint32_t</span><span class="PreProc"> r = op; \</span>
+<span class="PreProc">    p.push(r); \</span>
+<span class="PreProc">}</span>
+
+<span class="PreProc">#define OP_UNARY_STMT(name, op) \</span>
+<span class="Type">template</span><span class="PreProc"> &lt;</span><span class="Type">int</span><span class="PreProc"> W, </span><span class="Type">int</span><span class="PreProc"> H&gt; \</span>
+<span class="Type">void</span><span class="PreProc"> op_##name(VM&lt;W,H&gt; &amp;p) { \</span>
+<span class="PreProc">    </span><span class="Type">uint32_t</span><span class="PreProc"> a = p.pop(); \</span>
+<span class="PreProc">    op; \</span>
+<span class="PreProc">}</span>
+
+<span class="PreProc">#define OP_NULLARY_EXPR(name, op) \</span>
+<span class="Type">template</span><span class="PreProc"> &lt;</span><span class="Type">int</span><span class="PreProc"> W, </span><span class="Type">int</span><span class="PreProc"> H&gt; \</span>
+<span class="Type">void</span><span class="PreProc"> op_##name(VM&lt;W,H&gt; &amp;p) { \</span>
+<span class="PreProc">    </span><span class="Type">uint32_t</span><span class="PreProc"> r = op; \</span>
+<span class="PreProc">    p.push(r); \</span>
+<span class="PreProc">}</span>
+
+<span class="PreProc">#define OP_NULLARY_STMT(name, op) \</span>
+<span class="Type">template</span><span class="PreProc"> &lt;</span><span class="Type">int</span><span class="PreProc"> W, </span><span class="Type">int</span><span class="PreProc"> H&gt; \</span>
+<span class="Type">void</span><span class="PreProc"> op_##name(VM&lt;W,H&gt; &amp;p) { \</span>
+<span class="PreProc">    op; \</span>
+<span class="PreProc">}</span>
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt; \
+<span class="Type">void</span> op_halt(VM&lt;W,H&gt; &amp;p) { \
+    p.log.logf_ln(<span class="Constant">&quot;I [vm] halt instruction&quot;</span>);
+    p.halt();
+}
+
+OP_NULLARY_STMT(sub, p.step())
+OP_NULLARY_STMT(<span class="Statement">return</span>, p.return_sub())
+OP_UNARY_STMT(<span class="Statement">goto</span>, p.jump(p.get_sub(a)))
+OP_UNARY_STMT(gosub, p.jump_sub(p.get_sub(a)))
+OP_NULLARY_STMT(tick, p.next_tick())
+OP_NULLARY_STMT(noop, <span class="Statement">return</span>);
+
+OP_BINARY_STMT(cmp, <span class="Statement">if</span> (b) p.jump(p.get_sub(a)))
+OP_BINARY_STMT(cmpsub, <span class="Statement">if</span> (b) p.jump_sub(p.get_sub(a)))
+
+OP_BINARY_EXPR(eq, b == a)
+OP_BINARY_EXPR(lt, b &lt;  a)
+OP_BINARY_EXPR(le, b &lt;= a)
+OP_BINARY_EXPR(gt, b &gt;  a)
+OP_BINARY_EXPR(ge, b &gt;= a)
+OP_BINARY_EXPR(ne, b != a)
+
+OP_BINARY_EXPR(add, b + a)
+OP_BINARY_EXPR(min, b - a)
+OP_BINARY_EXPR(mul, b * a)
+OP_BINARY_EXPR(div, b / a)
+OP_BINARY_EXPR(mod, b % a)
+
+OP_BINARY_EXPR(<span class="Statement">and</span>, b &amp; a)
+OP_BINARY_EXPR(<span class="Statement">or</span>,  b | a)
+OP_BINARY_EXPR(<span class="Statement">xor</span>, b ^ a)
+OP_UNARY_EXPR(<span class="Statement">not</span>, !a)
+OP_BINARY_EXPR(bsl, b &lt;&lt; a)
+OP_BINARY_EXPR(bsr, b &gt;&gt; a)
+OP_UNARY_EXPR(comp, ~a)
+
+OP_NULLARY_EXPR(rand, rand())
+OP_NULLARY_EXPR(width, W)
+OP_NULLARY_EXPR(height, H)
+
+OP_BINARY_STMT(set, p.set_register(a, b))
+OP_UNARY_EXPR(get, p.get_register(a))
+OP_UNARY_STMT(tick_mode, p.set_register(REG_TICK_MODE, a))
+OP_UNARY_STMT(urgency, p.set_register(REG_URGENCY, a))
+OP_UNARY_STMT(brightness, p.set_register(REG_BRIGHTNESS, a))
+OP_UNARY_STMT(foreground, p.set_register(REG_FOREGROUND_COLOR, a))
+OP_UNARY_STMT(background, p.set_register(REG_BACKGROUND_COLOR, a))
+OP_UNARY_STMT(maskground, p.set_register(REG_MASKGROUND_COLOR, a))
+OP_NULLARY_STMT(mark, p.set_register(REG_MARK, <span class="Constant">0</span>));
+
+OP_NULLARY_STMT(fill, p.fill_screen())
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+<span class="Type">void</span> op_fill_rows(VM&lt;W,H&gt; &amp;p) {
+    <span class="Type">uint32_t</span> mask = p.pop();
+
+    <span class="Type">uint32_t</span> bit_mask = <span class="Constant">0x01u</span> &lt;&lt; (H - <span class="Constant">1</span>);
+    <span class="Statement">for</span> (<span class="Type">int</span> y = <span class="Constant">0</span>; y &lt; H; ++y) {
+        <span class="Type">uint32_t</span> row_mask = mask &amp; (bit_mask &gt;&gt; y);
+
+        <span class="Statement">if</span> (row_mask)
+            <span class="Statement">for</span> (<span class="Type">int</span> x = <span class="Constant">0</span>; x &lt; W; ++x)
+                p.put_pixel(x, y);
+    }
+}
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+<span class="Type">void</span> op_fill_columns(VM&lt;W,H&gt; &amp;p) {
+    <span class="Type">uint32_t</span> mask = p.pop();
+
+    <span class="Type">uint32_t</span> bit_mask = <span class="Constant">0x01u</span> &lt;&lt; (W - <span class="Constant">1</span>);
+    <span class="Statement">for</span> (<span class="Type">int</span> x = <span class="Constant">0</span>; x &lt; W; ++x) {
+        <span class="Type">uint32_t</span> col_mask = mask &amp; (bit_mask &gt;&gt; x);
+
+        <span class="Statement">if</span> (col_mask)
+            <span class="Statement">for</span> (<span class="Type">int</span> y = <span class="Constant">0</span>; y &lt; H; ++y)
+                p.put_pixel(x, y);
+    }
+}
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+<span class="Type">void</span> op_fill_bits(VM&lt;W,H&gt; &amp;p) {
+    <span class="Type">uint32_t</span> mask[H];
+    <span class="Statement">for</span> (<span class="Type">int</span> mp = <span class="Constant">0</span>; mp &lt; H; ++mp)
+        mask[mp] = p.pop();
+
+    <span class="Type">uint32_t</span> bit_mask = <span class="Constant">0x01u</span> &lt;&lt; (W - <span class="Constant">1</span>);
+    <span class="Statement">for</span> (<span class="Type">int</span> y = <span class="Constant">0</span>; y &lt; H; ++y) {
+        <span class="Type">uint32_t</span> row_mask = mask[y];
+
+        <span class="Statement">for</span> (<span class="Type">int</span> x = <span class="Constant">0</span>; x &lt; W; ++x) {
+            <span class="Statement">if</span> (row_mask &amp; (bit_mask &gt;&gt; x)) p.put_pixel(x, y);
+        }
+    }
+}
+
+OP_BINARY_STMT(pixel, p.put_pixel(b, a));
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+<span class="Type">void</span> op_mask_rows(VM&lt;W,H&gt; &amp;p) {
+    <span class="Type">uint32_t</span> mask = p.pop();
+
+    <span class="Type">uint32_t</span> bit_mask = <span class="Constant">0x01u</span> &lt;&lt; (H - <span class="Constant">1</span>);
+    <span class="Statement">for</span> (<span class="Type">int</span> y = <span class="Constant">0</span>; y &lt; H; ++y) {
+        <span class="Statement">if</span> (mask &amp; (bit_mask &gt;&gt; y))
+            p._panel_bitmask[y] = <span class="Constant">0xFFFFFFFFu</span>;
+        <span class="Statement">else</span>
+            p._panel_bitmask[y] = <span class="Constant">0x00000000u</span>;
+    }
+}
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+<span class="Type">void</span> op_mask_columns(VM&lt;W,H&gt; &amp;p) {
+    <span class="Type">uint32_t</span> mask = p.pop();
+    p.apply_column_mask(mask);
+}
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+<span class="Type">void</span> op_mask_bits(VM&lt;W,H&gt; &amp;p) {
+    <span class="Statement">for</span> (<span class="Type">int</span> mp = <span class="Constant">0</span>; mp &lt; H; ++mp) {
+        p._panel_bitmask[mp] = p.pop();
+    }
+}
+
+OP_NULLARY_EXPR(push, p.step());
+OP_NULLARY_STMT(pop, p.pop());
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+<span class="Type">void</span> op_dup(VM&lt;W,H&gt; &amp;p) {
+    <span class="Type">uint32_t</span> a = p.pop();
+    p.push(a);
+    p.push(a);
+}
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+<span class="Type">void</span> op_swap(VM&lt;W,H&gt; &amp;p) {
+    <span class="Type">uint32_t</span> a = p.pop();
+    <span class="Type">uint32_t</span> b = p.pop();
+    p.push(a);
+    p.push(b);
+}
+
+OP_UNARY_EXPR(read, p.read_stack(p.get_register(REG_STACK_SEGMENT) + a))
+OP_BINARY_STMT(write, p.write_stack(p.get_register(REG_STACK_SEGMENT) + a, b))
+OP_BINARY_STMT(alloc, p.allocate_stack(a, b))
+OP_UNARY_EXPR(readarg, p.read_stack(p.get_register(REG_STACK_SEGMENT) - a - <span class="Constant">2</span>))
+
+OP_UNARY_STMT(putchar, p.put_char(a));
+
+<span class="Type">template</span> &lt;<span class="Type">int</span> W, <span class="Type">int</span> H&gt;
+<span class="Type">void</span> op_set_cursor(VM&lt;W,H&gt; &amp;p) {
+    <span class="Type">uint32_t</span> a = p.pop();
+    <span class="Type">uint32_t</span> b = p.pop();
+    p.set_cursor(b, a);
+}
+
+<span class="PreProc">#endif</span><span class="Comment">//__VM_H</span>
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

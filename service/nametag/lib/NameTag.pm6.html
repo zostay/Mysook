@@ -1,0 +1,139 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<title>~/Documents/code/0/Mysook/service/nametag/lib/NameTag.pm6.html</title>
+<meta name="Generator" content="Vim/8.0">
+<meta name="plugin-version" content="vim7.4_v2">
+<meta name="syntax" content="perl6">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,expand_tabs,prevent_copy=">
+<meta name="colorscheme" content="desert256">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #c6c6c6; background-color: #000000; }
+body { font-family: monospace; color: #c6c6c6; background-color: #000000; }
+* { font-size: 1em; }
+.Comment { color: #87d7ff; }
+.Constant { color: #ffafaf; }
+.Special { color: #ffd7af; }
+.Statement { color: #ffd787; font-weight: bold; }
+.PreProc { color: #d75f5f; }
+.Normal { color: #c6c6c6; background-color: #000000; padding-bottom: 1px; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="PreProc">unit</span> <span class="Statement">module</span> <span class="Normal">NameTag</span><span class="Statement">;</span>
+
+<span class="Statement">enum</span> <span class="Normal">VMTickMode</span> <span class="PreProc">is</span> <span class="Special">export</span> (
+    <span class="Constant">MODE_NONE</span>         <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0000</span><span class="Statement">,</span>
+    <span class="Constant">MODE_BRIGHTNESS</span>   <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0001</span><span class="Statement">,</span>
+
+    <span class="Constant">MODE_MASK</span>         <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">00B1</span><span class="Statement">,</span>
+    <span class="Constant">MODE_MASK_ROWS</span>    <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">20B1</span><span class="Statement">,</span>
+    <span class="Constant">MODE_MASK_COLUMNS</span> <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">40B1</span><span class="Statement">,</span>
+    <span class="Constant">MODE_MASK_BITS</span>    <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">80B1</span><span class="Statement">,</span>
+
+    <span class="Constant">MODE_ROWS</span>         <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">2000</span><span class="Statement">,</span>
+    <span class="Constant">MODE_COLUMNS</span>      <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">4000</span><span class="Statement">,</span>
+    <span class="Constant">MODE_BITS</span>         <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">8000</span><span class="Statement">,</span>
+)<span class="Statement">;</span>
+
+<span class="Statement">enum</span> <span class="Normal">VMOp</span> <span class="PreProc">is</span> <span class="Special">export</span> (
+    <span class="Constant">OP_HALT</span>             <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">DEAD</span><span class="Statement">,</span>
+    <span class="Constant">OP_SUB</span>              <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0001</span><span class="Statement">,</span>
+    <span class="Constant">OP_RETURN</span>           <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0002</span><span class="Statement">,</span>
+    <span class="Constant">OP_GOTO</span>             <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0003</span><span class="Statement">,</span>
+    <span class="Constant">OP_GOSUB</span>            <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0004</span><span class="Statement">,</span>
+    <span class="Constant">OP_TICK</span>             <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0005</span><span class="Statement">,</span>
+    <span class="Constant">OP_NOOP</span>             <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0008</span><span class="Statement">,</span>
+
+    <span class="Constant">OP_CMP</span>              <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0011</span><span class="Statement">,</span>
+    <span class="Constant">OP_CMPSUB</span>           <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0012</span><span class="Statement">,</span>
+
+    <span class="Constant">OP_EQ</span>               <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0021</span><span class="Statement">,</span>
+    <span class="Constant">OP_LT</span>               <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0022</span><span class="Statement">,</span>
+    <span class="Constant">OP_LE</span>               <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0023</span><span class="Statement">,</span>
+    <span class="Constant">OP_GT</span>               <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0024</span><span class="Statement">,</span>
+    <span class="Constant">OP_GE</span>               <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0025</span><span class="Statement">,</span>
+    <span class="Constant">OP_NE</span>               <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0026</span><span class="Statement">,</span>
+
+    <span class="Constant">OP_ADD</span>              <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0031</span><span class="Statement">,</span>
+    <span class="Constant">OP_MIN</span>              <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0032</span><span class="Statement">,</span>
+    <span class="Constant">OP_MUL</span>              <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0033</span><span class="Statement">,</span>
+    <span class="Constant">OP_DIV</span>              <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0034</span><span class="Statement">,</span>
+    <span class="Constant">OP_MOD</span>              <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0035</span><span class="Statement">,</span>
+
+    <span class="Constant">OP_AND</span>              <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0041</span><span class="Statement">,</span>
+    <span class="Constant">OP_OR</span>               <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0042</span><span class="Statement">,</span>
+    <span class="Constant">OP_XOR</span>              <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0043</span><span class="Statement">,</span>
+    <span class="Constant">OP_NOT</span>              <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0044</span><span class="Statement">,</span>
+    <span class="Constant">OP_BSL</span>              <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0045</span><span class="Statement">,</span>
+    <span class="Constant">OP_BSR</span>              <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0046</span><span class="Statement">,</span>
+    <span class="Constant">OP_COMP</span>             <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0047</span><span class="Statement">,</span>
+
+    <span class="Constant">OP_RAND</span>             <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0051</span><span class="Statement">,</span>
+    <span class="Constant">OP_WIDTH</span>            <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0052</span><span class="Statement">,</span>
+    <span class="Constant">OP_HEIGHT</span>           <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0053</span><span class="Statement">,</span>
+
+    <span class="Constant">OP_SET</span>              <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0081</span><span class="Statement">,</span>
+    <span class="Constant">OP_GET</span>              <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0082</span><span class="Statement">,</span>
+    <span class="Comment"># OP_UNARY_SET        =&gt; 0x0083,</span>
+    <span class="Comment"># OP_UNARY_GET        =&gt; 0x0084,</span>
+    <span class="Constant">OP_TICK_MODE</span>        <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0083</span><span class="Statement">,</span>
+    <span class="Constant">OP_URGENCY</span>          <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0183</span><span class="Statement">,</span>
+    <span class="Constant">OP_BRIGHTNESS</span>       <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0283</span><span class="Statement">,</span>
+    <span class="Constant">OP_FOREGROUND</span>       <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0383</span><span class="Statement">,</span>
+    <span class="Constant">OP_BACKGROUND</span>       <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0483</span><span class="Statement">,</span>
+    <span class="Constant">OP_MASKGROUND</span>       <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0583</span><span class="Statement">,</span>
+    <span class="Constant">OP_MARK</span>             <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">0683</span><span class="Statement">,</span>
+
+    <span class="Constant">OP_FILL</span>             <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">00A1</span><span class="Statement">,</span>
+    <span class="Constant">OP_FILL_ROWS</span>        <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">20A1</span><span class="Statement">,</span>
+    <span class="Constant">OP_FILL_COLUMNS</span>     <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">40A1</span><span class="Statement">,</span>
+    <span class="Constant">OP_FILL_BITS</span>        <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">80A1</span><span class="Statement">,</span>
+    <span class="Constant">OP_PIXEL</span>            <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">00A2</span><span class="Statement">,</span>
+
+    <span class="Constant">OP_MASK_ROWS</span>        <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">20B1</span><span class="Statement">,</span>
+    <span class="Constant">OP_MASK_COLUMNS</span>     <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">40B1</span><span class="Statement">,</span>
+    <span class="Constant">OP_MASK_BITS</span>        <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">80B1</span><span class="Statement">,</span>
+
+    <span class="Constant">OP_PUSH</span>             <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">00C1</span><span class="Statement">,</span>
+    <span class="Constant">OP_POP</span>              <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">00C2</span><span class="Statement">,</span>
+    <span class="Constant">OP_DUP</span>              <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">00C3</span><span class="Statement">,</span>
+    <span class="Constant">OP_SWAP</span>             <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">00C5</span><span class="Statement">,</span>
+    <span class="Constant">OP_READ</span>             <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">80C8</span><span class="Statement">,</span>
+    <span class="Constant">OP_WRITE</span>            <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">80C9</span><span class="Statement">,</span>
+    <span class="Constant">OP_ALLOC</span>            <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">00CA</span><span class="Statement">,</span>
+    <span class="Constant">OP_READARG</span>          <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">80CB</span><span class="Statement">,</span>
+
+    <span class="Constant">OP_PUTCHAR</span>          <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">00D1</span><span class="Statement">,</span>
+    <span class="Constant">OP_SET_CURSOR</span>       <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">00D2</span><span class="Statement">,</span>
+)<span class="Statement">;</span>
+
+<span class="Statement">enum</span> <span class="Normal">VMRegister</span> <span class="PreProc">is</span> <span class="Special">export</span> (
+    <span class="Constant">REG_TICK_MODE</span>          <span class="Statement">=&gt;</span> <span class="Constant">0</span><span class="Statement">,</span>
+    <span class="Constant">REG_URGENCY</span>            <span class="Statement">=&gt;</span> <span class="Constant">1</span><span class="Statement">,</span>
+    <span class="Constant">REG_BRIGHTNESS</span>         <span class="Statement">=&gt;</span> <span class="Constant">2</span><span class="Statement">,</span>
+    <span class="Constant">REG_FOREGROUND_COLOR</span>   <span class="Statement">=&gt;</span> <span class="Constant">3</span><span class="Statement">,</span>
+    <span class="Constant">REG_BACKGROUND_COLOR</span>   <span class="Statement">=&gt;</span> <span class="Constant">4</span><span class="Statement">,</span>
+    <span class="Constant">REG_MASKGROUND_COLOR</span>   <span class="Statement">=&gt;</span> <span class="Constant">5</span><span class="Statement">,</span>
+    <span class="Constant">REG_MARK</span>               <span class="Statement">=&gt;</span> <span class="Constant">6</span><span class="Statement">,</span>
+    <span class="Constant">REG_STACK_SEGMENT</span>      <span class="Statement">=&gt;</span> <span class="Constant">7</span><span class="Statement">,</span>
+    <span class="Constant">REG_CURSOR_X</span>           <span class="Statement">=&gt;</span> <span class="Constant">8</span><span class="Statement">,</span>
+    <span class="Constant">REG_CURSOR_Y</span>           <span class="Statement">=&gt;</span> <span class="Constant">9</span><span class="Statement">,</span>
+    <span class="Constant">REG_USER0</span>              <span class="Statement">=&gt;</span> <span class="Constant">16</span><span class="Statement">,</span>
+    <span class="Constant">REG_USER239</span>            <span class="Statement">=&gt;</span> <span class="Constant">255</span><span class="Statement">,</span>
+)<span class="Statement">;</span>
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

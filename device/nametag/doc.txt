@@ -1,0 +1,58 @@
+# How it works...
+
+## Fallback Mode
+
+To start, it operates in a fallback mode. In this mode, it runs the "default
+program" which are a set of pre-programmed screen changes which work as a plain
+old name tag.
+
+## API Driven Mode
+
+When it is able to gain access to an Internet connection, it makes calls to the
+API service:
+
+* Ask how many TICKS are in the program, which may be an integer or "inf".
+
+    * If the number of ticks is greater than MAX_TICKS_AT_A_TIME * 2,
+
+        * The nametag requests ticks N through M, where M = N +
+          MAX_TICKS_AT_A_TIME and N is the highest tick number previously
+          requested (startin with 0). These are then stored in an array that
+          contains MAX_TICKS_AT_TIME * 2 instructions.
+
+        * When current_tick reaches N, a new request is made for the next set of
+          ticks.
+
+    * Otherwise (ticks < MAX_TICKS_AT_A_TIME * 2)
+    
+        * The nametag requests ticks 0 through ticks.
+
+* The program iterates through the ticks at TICK_RATE, which starts at 1 Hz,
+  executing each instruction in the list.
+
+* The basic instructions are:
+
+    * CHANGE_TICK_RATE(NEW_TICK_RATE) -> changes TICK_RATE to NEW_TICK_RATE
+
+    * SET_PIXEL(X, Y, R, G, B) -> changes the PIXEL at (X, Y) to (R, G, B)
+
+    * SET_BRIGHTNESS(B) -> changes panel brightness to B (which will be capped
+      to a reasonable, non-blinding range)
+
+    * SET_BITMAP(R0, G0, B0, R1, G1, B1, R2, G2, B2 ...) -> replaces the panel
+      contents with the given bitmap
+
+    * CLEAR(R, G, B) -> replaces all pixels with (R, G, B)
+
+    * More instructions to be added as I decide I want them.
+
+* The largest possible instruction will be SET_BITMAP(), so we will pick
+  MAX_TICKS_AT_A_TIME to consider the largest amount of memory I'm willing to
+  lose to a series of those instructions. The offset between instructions will
+  be based on the size of that instructions (1 + 12 * 6 * 3 bytes).
+
+* Each instruction is one byte long followed by the arguments.
+
+## Direct Mode
+
+Take UDP packets with instructions one at a time.

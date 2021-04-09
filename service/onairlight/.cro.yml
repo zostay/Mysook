@@ -1,0 +1,15 @@
+---
+name: onairlight
+cro: 1
+id: onairlight
+env:  []
+links:  []
+entrypoint: service.p6
+endpoints: 
+  - 
+    port-env: ONAIRLIGHT_PORT
+    name: HTTP
+    protocol: http
+    host-env: ONAIRLIGHT_HOST
+    id: http
+...

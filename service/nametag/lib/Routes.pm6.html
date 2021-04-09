@@ -1,0 +1,267 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<title>~/Documents/code/0/Mysook/service/nametag/lib/Routes.pm6.html</title>
+<meta name="Generator" content="Vim/8.0">
+<meta name="plugin-version" content="vim7.4_v2">
+<meta name="syntax" content="perl6">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,expand_tabs,prevent_copy=">
+<meta name="colorscheme" content="desert256">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #c6c6c6; background-color: #000000; }
+body { font-family: monospace; color: #c6c6c6; background-color: #000000; }
+* { font-size: 1em; }
+.Type { color: #afaf5f; font-weight: bold; }
+.Comment { color: #87d7ff; }
+.Constant { color: #ffafaf; }
+.Special { color: #ffd7af; }
+.Statement { color: #ffd787; font-weight: bold; }
+.PreProc { color: #d75f5f; }
+.Identifier { color: #87ff87; }
+.Normal { color: #c6c6c6; background-color: #000000; padding-bottom: 1px; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="PreProc">use</span> <span class="Special">v6</span><span class="Statement">;</span>
+
+<span class="PreProc">use</span> <span class="Normal">Base64</span><span class="Statement">;</span>
+<span class="PreProc">use</span> <span class="Normal">Cro</span>::<span class="Normal">HTTP</span>::<span class="Normal">Middleware</span><span class="Statement">;</span>
+<span class="PreProc">use</span> <span class="Normal">Cro</span>::<span class="Normal">HTTP</span>::<span class="Normal">Router</span><span class="Statement">;</span>
+
+<span class="PreProc">use</span> <span class="Normal">DB</span><span class="Statement">;</span>
+<span class="PreProc">use</span> <span class="Normal">NameTag</span><span class="Statement">;</span>
+<span class="PreProc">use</span> <span class="Normal">NameTag</span>::<span class="Normal">ProgramValidator</span><span class="Statement">;</span>
+
+<span class="Statement">subset</span> <span class="Normal">AutoID</span> <span class="PreProc">of</span> <span class="Type">UInt</span> <span class="PreProc">where</span> <span class="Statement">*</span> <span class="Statement">&gt;</span> <span class="Constant">0</span><span class="Statement">;</span>
+<span class="Statement">subset</span> <span class="Normal">ProgramName</span> <span class="PreProc">of</span> <span class="Type">Str</span> <span class="PreProc">where</span> <span class="Special">/</span><span class="Special">^</span><span class="Constant"> </span><span class="Special">&lt;[</span><span class="Constant">- _ a</span><span class="Special">..</span><span class="Constant">z A</span><span class="Special">..</span><span class="Constant">Z 0</span><span class="Special">..</span><span class="Constant">9 .</span><span class="Special">]&gt;</span><span class="Constant"> </span><span class="Special">**</span><span class="Constant"> 3</span><span class="Special">..*</span><span class="Constant"> </span><span class="Special">$</span><span class="Special">/</span><span class="Statement">;</span>
+<span class="Statement">subset</span> <span class="Normal">QueueName</span> <span class="PreProc">of</span> <span class="Type">Str</span> <span class="PreProc">where</span> <span class="Special">/</span><span class="Special">^</span><span class="Constant"> </span><span class="Special">&lt;[</span><span class="Constant">- _ a</span><span class="Special">..</span><span class="Constant">z A</span><span class="Special">..</span><span class="Constant">Z 0</span><span class="Special">..</span><span class="Constant">9 .</span><span class="Special">]&gt;</span><span class="Constant"> </span><span class="Special">**</span><span class="Constant"> 3</span><span class="Special">..*</span><span class="Constant"> </span><span class="Special">$</span><span class="Special">/</span><span class="Statement">;</span>
+<span class="Statement">subset</span> <span class="Normal">AdminToken</span> <span class="PreProc">of</span> <span class="Type">Str</span> <span class="PreProc">where</span> <span class="Special">/</span><span class="Special">^</span><span class="Constant"> </span><span class="Special">&lt;[</span><span class="Constant"> a</span><span class="Special">..</span><span class="Constant">z A</span><span class="Special">..</span><span class="Constant">Z 0</span><span class="Special">..</span><span class="Constant">9 </span><span class="Special">]&gt;</span><span class="Constant"> </span><span class="Special">**</span><span class="Constant"> 40 </span><span class="Special">$</span><span class="Special">/</span><span class="Statement">;</span>
+
+<span class="Statement">class</span> <span class="Normal">LoggedAdmin</span> <span class="PreProc">does</span> <span class="Normal">Cro</span>::<span class="Normal">HTTP</span>::<span class="Normal">Auth</span> { }
+
+<span class="Statement">class</span> <span class="Normal">AdminAuth</span> <span class="PreProc">does</span> <span class="Normal">Cro</span>::<span class="Normal">HTTP</span>::<span class="Normal">Middleware</span>::<span class="Normal">Request</span> {
+    <span class="Special">has</span> <span class="Identifier">$</span><span class="Special">.</span><span class="Identifier">admin-token</span><span class="Statement">;</span>
+
+    <span class="Statement">submethod</span> <span class="Normal">TWEAK</span> {
+        <span class="Statement">die</span> <span class="Special">&quot;</span><span class="Constant">missing ADMIN_TOKEN</span><span class="Special">&quot;</span> <span class="Statement">without</span> <span class="Identifier">%</span><span class="Special">*</span><span class="Identifier">ENV</span><span class="Special">&lt;</span><span class="Constant">ADMIN_TOKEN</span><span class="Special">&gt;</span><span class="Statement">;</span>
+        <span class="Statement">die</span> <span class="Special">&quot;</span><span class="Constant">ADMIN_TOKEN must be formatted as 40 letters and numbers</span><span class="Special">&quot;</span>
+            <span class="Statement">unless</span> <span class="Identifier">%</span><span class="Special">*</span><span class="Identifier">ENV</span><span class="Special">&lt;</span><span class="Constant">ADMIN_TOKEN</span><span class="Special">&gt;</span><span class="Statement">.</span><span class="Type">Str</span> <span class="Statement">~~</span> <span class="Normal">AdminToken</span><span class="Statement">;</span>
+
+
+        <span class="Identifier">$</span><span class="Special">!</span><span class="Identifier">admin-token</span> <span class="Statement">=</span> <span class="Identifier">%</span><span class="Special">*</span><span class="Identifier">ENV</span><span class="Special">&lt;</span><span class="Constant">ADMIN_TOKEN</span><span class="Special">&gt;</span><span class="Statement">.</span><span class="Type">Str</span><span class="Statement">;</span>
+    }
+
+    <span class="Statement">method</span> <span class="Normal">process</span>(<span class="Normal">Supply</span> <span class="Identifier">$</span><span class="Identifier">requests</span> <span class="Statement">--&gt;</span> <span class="Normal">Supply</span>) {
+        <span class="Comment"># I trust anyone who has a private key matching the server's</span>
+        <span class="Comment"># public key... because that should only be me. :)</span>
+        <span class="Normal">supply</span> <span class="Normal">whenever</span> <span class="Identifier">$</span><span class="Identifier">requests</span> <span class="Statement">-&gt;</span> <span class="Identifier">$</span><span class="Identifier">req</span> {
+            <span class="Special">my</span> <span class="Identifier">$</span><span class="Identifier">auth</span> <span class="Statement">=</span> <span class="Type">Nil</span><span class="Statement">;</span>
+            <span class="Special">my</span> <span class="Identifier">$</span><span class="Identifier">header</span> <span class="Statement">=</span> <span class="Identifier">$</span><span class="Identifier">req</span><span class="Statement">.</span><span class="Normal">header</span>(<span class="Special">'</span><span class="Constant">Authorization</span><span class="Special">'</span>)<span class="Statement">;</span>
+            <span class="Statement">with</span> <span class="Identifier">$</span><span class="Identifier">header</span> <span class="Statement">-&gt;</span> <span class="Identifier">$</span><span class="Identifier">auth-header</span> {
+                <span class="Special">my</span> (<span class="Identifier">$</span><span class="Identifier">type</span><span class="Statement">,</span> <span class="Identifier">$</span><span class="Identifier">credentials</span>) <span class="Statement">=</span> <span class="Identifier">$</span><span class="Identifier">auth-header</span><span class="Statement">.</span><span class="Normal">split</span>(<span class="Special">'</span><span class="Constant"> </span><span class="Special">'</span><span class="Statement">,</span> <span class="Constant">2</span>)<span class="Statement">;</span>
+
+                <span class="Statement">if</span> <span class="Identifier">$</span><span class="Identifier">type</span><span class="Statement">.</span><span class="Normal">lc</span> <span class="Statement">eq</span> <span class="Special">'</span><span class="Constant">bearer</span><span class="Special">'</span> {
+                    <span class="Identifier">$</span><span class="Identifier">auth</span> <span class="Statement">=</span> <span class="Normal">LoggedAdmin</span><span class="Statement">.</span><span class="Normal">new</span> <span class="Statement">if</span> <span class="Identifier">$</span><span class="Identifier">credentials</span> <span class="Statement">eq</span> <span class="Identifier">$</span><span class="Special">!</span><span class="Identifier">admin-token</span><span class="Statement">;</span>
+                }
+            }
+
+            <span class="Identifier">$</span><span class="Identifier">req</span><span class="Statement">.</span><span class="Normal">auth</span> <span class="Statement">=</span> <span class="Identifier">$</span><span class="Identifier">auth</span><span class="Statement">;</span>
+            <span class="Normal">emit</span> <span class="Identifier">$</span><span class="Identifier">req</span><span class="Statement">;</span>
+        }
+    }
+}
+
+<span class="Statement">sub</span> <span class="Normal">check-auth</span>(<span class="Identifier">&amp;</span><span class="Identifier">code</span>) {
+    <span class="Statement">if</span> <span class="Normal">request</span><span class="Statement">.</span><span class="Normal">auth</span> <span class="Statement">~~</span> <span class="Normal">LoggedAdmin</span> {
+        <span class="Normal">code</span>()<span class="Statement">;</span>
+    }
+    <span class="Statement">else</span> {
+        <span class="Normal">response</span><span class="Statement">.</span><span class="Normal">status</span> <span class="Statement">=</span> <span class="Constant">401</span><span class="Statement">;</span>
+        <span class="Normal">content</span> <span class="Special">'</span><span class="Constant">application/json</span><span class="Special">'</span><span class="Statement">,</span> <span class="Statement">%</span>(
+            <span class="Constant">error</span>   <span class="Statement">=&gt;</span> <span class="Type">True</span><span class="Statement">,</span>
+            <span class="Constant">message</span> <span class="Statement">=&gt;</span> <span class="Special">'</span><span class="Constant">unauthorized</span><span class="Special">'</span><span class="Statement">,</span>
+        )<span class="Statement">;</span>
+    }
+}
+
+<span class="Statement">class</span> <span class="Normal">X</span>::<span class="Normal">ValidationFail</span> <span class="PreProc">is</span> <span class="Type">Exception</span> {
+    <span class="Special">has</span> <span class="Identifier">$</span><span class="Special">.</span><span class="Identifier">field</span><span class="Statement">;</span>
+    <span class="Special">has</span> <span class="Identifier">$</span><span class="Special">.</span><span class="Identifier">message</span><span class="Statement">;</span>
+    <span class="Statement">multi</span> <span class="Statement">method</span> <span class="Normal">new</span>(<span class="Identifier">$</span><span class="Identifier">field</span><span class="Statement">,</span> <span class="Identifier">$</span><span class="Identifier">message</span>) { <span class="Identifier">self</span><span class="Statement">.</span><span class="Normal">bless</span>(<span class="Statement">:</span><span class="Identifier">$</span><span class="Identifier">field</span><span class="Statement">,</span> <span class="Statement">:</span><span class="Identifier">$</span><span class="Identifier">message</span>) }
+    <span class="Statement">method</span> <span class="Normal">Str</span>() { <span class="Special">&quot;</span><span class="Identifier">$</span><span class="Special">!</span><span class="Identifier">field</span><span class="Constant">: </span><span class="Identifier">$</span><span class="Special">!</span><span class="Identifier">message</span><span class="Special">&quot;</span> }
+}
+
+<span class="Statement">sub</span> <span class="Normal">routes</span>() <span class="PreProc">is</span> <span class="Special">export</span> {
+    <span class="Special">my</span> <span class="Identifier">$</span><span class="Identifier">db</span> <span class="Statement">=</span> <span class="Normal">DB</span><span class="Statement">.</span><span class="Normal">new</span><span class="Statement">;</span>
+    <span class="Identifier">$</span><span class="Identifier">db</span><span class="Statement">.</span><span class="Normal">create-schema</span><span class="Statement">;</span>
+
+    <span class="Special">my</span> <span class="Identifier">$</span><span class="Identifier">rate-limited-routes</span> <span class="Statement">=</span> <span class="Normal">route</span> {
+        <span class="Statement">before</span> <span class="Normal">AdminAuth</span><span class="Statement">.</span><span class="Normal">new</span><span class="Statement">;</span>
+
+        <span class="Comment"># Upload a program</span>
+        <span class="Normal">post</span> <span class="Statement">-&gt;</span> <span class="Special">'</span><span class="Constant">program</span><span class="Special">'</span> {
+            <span class="Normal">check-auth</span> {
+                <span class="Normal">request-body</span> <span class="Statement">-&gt;</span> <span class="Identifier">%</span><span class="Identifier">program</span> {
+                    <span class="Identifier">%</span><span class="Identifier">program</span><span class="Special">&lt;</span><span class="Constant">name</span><span class="Special">&gt;</span><span class="Statement">.</span><span class="Normal">defined</span> <span class="Statement">&amp;&amp;</span> <span class="Identifier">%</span><span class="Identifier">program</span><span class="Special">&lt;</span><span class="Constant">name</span><span class="Special">&gt;</span> <span class="Statement">~~</span> <span class="Special">/</span><span class="Special">\w</span><span class="Special">+</span><span class="Special">/</span>
+                        <span class="Statement">or</span> <span class="Statement">die</span> <span class="Normal">X</span>::<span class="Normal">ValidationFail</span><span class="Statement">.</span><span class="Normal">new</span>(<span class="Special">&quot;</span><span class="Constant">name</span><span class="Special">&quot;</span><span class="Statement">,</span> <span class="Special">&quot;</span><span class="Constant">You must give your program a name.</span><span class="Special">&quot;</span>)<span class="Statement">;</span>
+                    <span class="Special">my</span> <span class="Identifier">$</span><span class="Identifier">name</span> <span class="Statement">=</span> <span class="Identifier">%</span><span class="Identifier">program</span><span class="Special">&lt;</span><span class="Constant">name</span><span class="Special">&gt;</span><span class="Statement">.</span><span class="Normal">trim</span><span class="Statement">;</span>
+
+                    <span class="Identifier">%</span><span class="Identifier">program</span><span class="Special">&lt;</span><span class="Constant">author</span><span class="Special">&gt;</span><span class="Statement">.</span><span class="Normal">defined</span> <span class="Statement">&amp;&amp;</span> <span class="Identifier">%</span><span class="Identifier">program</span><span class="Special">&lt;</span><span class="Constant">author</span><span class="Special">&gt;</span> <span class="Statement">~~</span> <span class="Special">/</span><span class="Special">^</span><span class="Special">[</span>github<span class="Special">|</span>cpan<span class="Special">|</span>http<span class="Special">|</span>https<span class="Special">]</span><span class="Special">:</span><span class="Special">\S</span><span class="Special">+</span><span class="Special">/</span>
+                        <span class="Statement">or</span> <span class="Statement">die</span> <span class="Normal">X</span>::<span class="Normal">ValidationFail</span><span class="Statement">.</span><span class="Normal">new</span>(<span class="Special">&quot;</span><span class="Constant">author</span><span class="Special">&quot;</span><span class="Statement">,</span> <span class="Special">&quot;</span><span class="Constant">You must give a URL claiming authorship, e.g., github:zostay, cpan:HANENKAMP, or <a href="https://sterling.hanenkamp.com/">https://sterling.hanenkamp.com/</a></span><span class="Special">&quot;</span>)<span class="Statement">;</span>
+                    <span class="Special">my</span> <span class="Identifier">$</span><span class="Identifier">author</span> <span class="Statement">=</span> <span class="Identifier">%</span><span class="Identifier">program</span><span class="Special">&lt;</span><span class="Constant">author</span><span class="Special">&gt;</span><span class="Statement">.</span><span class="Normal">trim</span><span class="Statement">;</span>
+
+                    <span class="Identifier">%</span><span class="Identifier">program</span><span class="Special">&lt;</span><span class="Constant">program</span><span class="Special">&gt;</span><span class="Statement">.</span><span class="Normal">defined</span> <span class="Statement">&amp;&amp;</span> <span class="Identifier">%</span><span class="Identifier">program</span><span class="Special">&lt;</span><span class="Constant">program</span><span class="Special">&gt;</span> <span class="Statement">~~</span> <span class="Special">m</span><span class="Special">{</span><span class="Special">^</span><span class="Special">&lt;[</span><span class="Constant">a</span><span class="Special">..</span><span class="Constant">zA</span><span class="Special">..</span><span class="Constant">Z0</span><span class="Special">..</span><span class="Constant">9+/</span><span class="Special">]&gt;</span><span class="Constant"> </span><span class="Special">**</span><span class="Constant"> 22</span><span class="Special">..</span><span class="Constant">87382 </span><span class="Special">'</span><span class="Constant">=</span><span class="Special">'</span><span class="Special">*</span><span class="Constant"> </span><span class="Special">$</span><span class="Special">}</span>
+                        <span class="Statement">or</span> <span class="Statement">die</span> <span class="Normal">X</span>::<span class="Normal">ValidationFail</span><span class="Statement">.</span><span class="Normal">new</span>(<span class="Special">&quot;</span><span class="Constant">program</span><span class="Special">&quot;</span><span class="Statement">,</span> <span class="Special">&quot;</span><span class="Constant">You must provide the program as a BASE-64 encoded string.</span><span class="Special">&quot;</span>)<span class="Statement">;</span>
+                    <span class="Special">my</span> <span class="Identifier">$</span><span class="Identifier">b64-program</span> <span class="Statement">=</span> <span class="Identifier">%</span><span class="Identifier">program</span><span class="Special">&lt;</span><span class="Constant">program</span><span class="Special">&gt;</span><span class="Statement">;</span>
+                    <span class="Special">my</span> <span class="Identifier">$</span><span class="Identifier">bin-program</span> <span class="Statement">=</span> <span class="Normal">decode-base64</span>(<span class="Identifier">$</span><span class="Identifier">b64-program</span><span class="Statement">,</span> <span class="Statement">:</span><span class="Constant">bin</span>)<span class="Statement">;</span>
+
+                    {
+                        <span class="Normal">validate-program</span>(<span class="Identifier">$</span><span class="Identifier">bin-program</span>)<span class="Statement">;</span>
+
+                        <span class="PreProc">CATCH</span> {
+                            <span class="Special">when</span> (<span class="Normal">X</span>::<span class="Normal">NameTag</span>::<span class="Normal">ProgramValidator</span>) {
+                                <span class="Statement">die</span> <span class="Normal">X</span>::<span class="Normal">ValidationFail</span><span class="Statement">.</span><span class="Normal">new</span>(<span class="Special">&quot;</span><span class="Constant">program</span><span class="Special">&quot;</span><span class="Statement">,</span> <span class="Special">&quot;</span><span class="Constant">Your program is not valid: </span><span class="Identifier">$</span><span class="Identifier">_</span><span class="Special">&quot;</span>)<span class="Statement">;</span>
+                            }
+                        }
+                    }
+
+                    <span class="Special">my</span> <span class="Identifier">$</span><span class="Identifier">id</span> <span class="Statement">=</span> <span class="Identifier">$</span><span class="Identifier">db</span><span class="Statement">.</span><span class="Normal">save-program</span>(<span class="Identifier">$</span><span class="Identifier">name</span><span class="Statement">,</span> <span class="Identifier">$</span><span class="Identifier">author</span><span class="Statement">,</span> <span class="Identifier">$</span><span class="Identifier">bin-program</span>)<span class="Statement">;</span>
+                    <span class="Normal">created</span> <span class="Special">&quot;</span><span class="Constant">program/</span><span class="Identifier">$</span><span class="Identifier">id</span><span class="Special">&quot;</span><span class="Statement">,</span> <span class="Special">'</span><span class="Constant">application/json</span><span class="Special">'</span><span class="Statement">,</span> <span class="Statement">%</span>(
+                        <span class="Constant">id</span>      <span class="Statement">=&gt;</span> <span class="Identifier">$</span><span class="Identifier">id</span><span class="Statement">,</span>
+                        <span class="Constant">name</span>    <span class="Statement">=&gt;</span> <span class="Identifier">$</span><span class="Identifier">name</span><span class="Statement">,</span>
+                        <span class="Constant">author</span>  <span class="Statement">=&gt;</span> <span class="Identifier">$</span><span class="Identifier">author</span><span class="Statement">,</span>
+                        <span class="Constant">program</span> <span class="Statement">=&gt;</span> <span class="Normal">encode-base64</span>(<span class="Identifier">$</span><span class="Identifier">bin-program</span><span class="Statement">,</span> <span class="Statement">:</span><span class="Constant">str</span>)<span class="Statement">,</span>
+                    )<span class="Statement">;</span>
+
+                    <span class="PreProc">CATCH</span> {
+                        <span class="Special">when</span> <span class="Normal">X</span>::<span class="Normal">ValidationFail</span> {
+                            <span class="Normal">bad-request</span> <span class="Special">'</span><span class="Constant">application/json</span><span class="Special">'</span><span class="Statement">,</span> <span class="Statement">%</span>(
+                                <span class="Constant">error</span>   <span class="Statement">=&gt;</span> <span class="Type">True</span><span class="Statement">,</span>
+                                <span class="Constant">field</span>   <span class="Statement">=&gt;</span> <span class="Statement">.</span><span class="Normal">field</span><span class="Statement">,</span>
+                                <span class="Constant">message</span> <span class="Statement">=&gt;</span> <span class="Statement">.</span><span class="Normal">message</span><span class="Statement">,</span>
+                            )<span class="Statement">;</span>
+                        }
+                    }
+                }
+            }
+        }
+
+        <span class="Comment"># Enqueue a program</span>
+        <span class="Normal">post</span> <span class="Statement">-&gt;</span> <span class="Special">'</span><span class="Constant">queue</span><span class="Special">'</span><span class="Statement">,</span> <span class="Normal">QueueName</span> <span class="Identifier">$</span><span class="Identifier">name</span> {
+            <span class="Normal">check-auth</span> {
+                <span class="Normal">request-body</span> <span class="Statement">-&gt;</span> <span class="Identifier">%</span><span class="Identifier">program-info</span> (<span class="Normal">AutoID</span> <span class="Statement">:</span><span class="Identifier">$</span><span class="Identifier">id</span>) {
+                    <span class="Special">my</span> <span class="Identifier">%</span><span class="Identifier">program</span> <span class="Statement">=</span> <span class="Identifier">$</span><span class="Identifier">db</span><span class="Statement">.</span><span class="Normal">load-program</span>(<span class="Identifier">$</span><span class="Identifier">id</span>)<span class="Statement">;</span>
+                    <span class="Statement">with</span> <span class="Identifier">%</span><span class="Identifier">program</span><span class="Special">&lt;</span><span class="Constant">id</span><span class="Special">&gt;</span> {
+                        <span class="Identifier">$</span><span class="Identifier">db</span><span class="Statement">.</span><span class="Normal">enqueue-program</span>(<span class="Identifier">$</span><span class="Identifier">name</span><span class="Statement">,</span> <span class="Identifier">$</span><span class="Identifier">id</span>)<span class="Statement">;</span>
+
+                        <span class="Normal">content</span> <span class="Special">'</span><span class="Constant">application/json</span><span class="Special">'</span><span class="Statement">,</span> <span class="Statement">%;</span>
+                    }
+                    <span class="Statement">else</span> {
+                        <span class="Normal">bad-request</span> <span class="Special">'</span><span class="Constant">application/json</span><span class="Special">'</span><span class="Statement">,</span> <span class="Statement">%</span>(
+                            <span class="Constant">error</span>   <span class="Statement">=&gt;</span> <span class="Type">True</span><span class="Statement">,</span>
+                            <span class="Constant">field</span>   <span class="Statement">=&gt;</span> <span class="Special">'</span><span class="Constant">id</span><span class="Special">'</span><span class="Statement">,</span>
+                            <span class="Constant">message</span> <span class="Statement">=&gt;</span> <span class="Special">'</span><span class="Constant">You must name the program ID to enqueue.</span><span class="Special">'</span><span class="Statement">,</span>
+                        )<span class="Statement">;</span>
+                    }
+                }
+            }
+        }
+
+        <span class="Comment"># List programs in a queue</span>
+        <span class="Normal">get</span> <span class="Statement">-&gt;</span> <span class="Special">'</span><span class="Constant">queue</span><span class="Special">'</span><span class="Statement">,</span> <span class="Normal">QueueName</span> <span class="Identifier">$</span><span class="Identifier">name</span> {
+            <span class="Special">my</span> <span class="Identifier">@</span><span class="Identifier">programs</span> <span class="Statement">=</span> <span class="Identifier">$</span><span class="Identifier">db</span><span class="Statement">.</span><span class="Normal">list-queue</span>(<span class="Identifier">$</span><span class="Identifier">name</span>)<span class="Statement">;</span>
+            <span class="Normal">content</span> <span class="Special">'</span><span class="Constant">application/json</span><span class="Special">'</span><span class="Statement">,</span> <span class="Statement">%</span>(<span class="Statement">:</span><span class="Identifier">@</span><span class="Identifier">programs</span>)<span class="Statement">;</span>
+        }
+
+        <span class="Comment"># Overwrite the queue completely</span>
+        <span class="Normal">put</span> <span class="Statement">-&gt;</span> <span class="Special">'</span><span class="Constant">queue</span><span class="Special">'</span><span class="Statement">,</span> <span class="Normal">QueueName</span> <span class="Identifier">$</span><span class="Identifier">name</span> {
+            <span class="Normal">check-auth</span> {
+                <span class="Normal">request-body</span> <span class="Statement">-&gt;</span> <span class="Identifier">%</span><span class="Identifier">program-info</span> {
+                    <span class="Special">my</span> <span class="Identifier">$</span><span class="Identifier">bad</span> <span class="Statement">=</span> <span class="Type">False</span><span class="Statement">;</span>
+                    <span class="Statement">for</span> <span class="Statement">@</span>(<span class="Identifier">%</span><span class="Identifier">program-info</span><span class="Special">&lt;</span><span class="Constant">programs</span><span class="Special">&gt;</span>) <span class="Statement">-&gt;</span> <span class="Identifier">%</span><span class="Identifier">p</span> {
+                        <span class="Statement">unless</span> <span class="Identifier">%</span><span class="Identifier">p</span><span class="Special">&lt;</span><span class="Constant">id</span><span class="Special">&gt;</span><span class="Statement">.</span><span class="Normal">defined</span> <span class="Statement">&amp;&amp;</span> <span class="Identifier">%</span><span class="Identifier">p</span><span class="Special">&lt;</span><span class="Constant">id</span><span class="Special">&gt;</span> <span class="Statement">~~</span> <span class="Normal">AutoID</span> {
+                            <span class="Identifier">$</span><span class="Identifier">bad</span> <span class="Statement">=</span> <span class="Type">True</span><span class="Statement">;</span>
+                            <span class="Special">last</span><span class="Statement">;</span>
+                        }
+                    }
+
+                    <span class="Statement">if</span> <span class="Identifier">$</span><span class="Identifier">bad</span> {
+                        <span class="Normal">bad-request</span> <span class="Special">'</span><span class="Constant">application/json</span><span class="Special">'</span><span class="Statement">,</span> <span class="Statement">%</span>(
+                            <span class="Constant">error</span> <span class="Statement">=&gt;</span> <span class="Type">True</span><span class="Statement">,</span>
+                            <span class="Constant">field</span> <span class="Statement">=&gt;</span> <span class="Special">'</span><span class="Constant">programs</span><span class="Special">'</span><span class="Statement">,</span>
+                            <span class="Constant">message</span> <span class="Statement">=&gt;</span> <span class="Special">'</span><span class="Constant">You must name uploaded program IDs to set the queue.</span><span class="Special">'</span><span class="Statement">,</span>
+                        )<span class="Statement">;</span>
+                    }
+
+                    <span class="Special">my</span> <span class="Identifier">@</span><span class="Identifier">programs</span> <span class="Statement">=</span> <span class="Identifier">$</span><span class="Identifier">db</span><span class="Statement">.</span><span class="Normal">set-queue</span>(<span class="Identifier">$</span><span class="Identifier">name</span><span class="Statement">,</span> <span class="Identifier">%</span><span class="Identifier">program-info</span><span class="Special">&lt;</span><span class="Constant">programs</span><span class="Special">&gt;</span>)<span class="Statement">;</span>
+                    <span class="Normal">content</span> <span class="Special">'</span><span class="Constant">application/json</span><span class="Special">'</span><span class="Statement">,</span> <span class="Statement">%</span>(<span class="Statement">:</span><span class="Identifier">@</span><span class="Identifier">programs</span>)<span class="Statement">;</span>
+                }
+            }
+        }
+    }
+
+    <span class="Special">my</span> <span class="Identifier">$</span><span class="Identifier">japh-routes</span> <span class="Statement">=</span> <span class="Normal">route</span> {
+
+        <span class="Comment"># List all programs</span>
+        <span class="Normal">get</span> <span class="Statement">-&gt;</span> <span class="Special">'</span><span class="Constant">program</span><span class="Special">'</span> {
+            <span class="Special">my</span> <span class="Identifier">@</span><span class="Identifier">programs</span> <span class="Statement">=</span> <span class="Identifier">$</span><span class="Identifier">db</span><span class="Statement">.</span><span class="Normal">list-programs</span><span class="Statement">;</span>
+            <span class="Normal">content</span> <span class="Special">'</span><span class="Constant">application/json</span><span class="Special">'</span><span class="Statement">,</span> <span class="Statement">%</span>(<span class="Statement">:</span><span class="Identifier">@</span><span class="Identifier">programs</span>)<span class="Statement">;</span>
+        }
+
+        <span class="Comment"># Get a program</span>
+        <span class="Normal">get</span> <span class="Statement">-&gt;</span> <span class="Special">'</span><span class="Constant">program</span><span class="Special">'</span><span class="Statement">,</span> <span class="Normal">AutoID</span> <span class="Identifier">$</span><span class="Identifier">id</span> {
+            <span class="Special">my</span> <span class="Identifier">%</span><span class="Identifier">program</span> <span class="Statement">=</span> <span class="Identifier">$</span><span class="Identifier">db</span><span class="Statement">.</span><span class="Normal">load-program</span>(<span class="Identifier">$</span><span class="Identifier">id</span>)<span class="Statement">;</span>
+            <span class="Statement">if</span> <span class="Identifier">%</span><span class="Identifier">program</span> {
+                <span class="Normal">content</span> <span class="Special">'</span><span class="Constant">application/json</span><span class="Special">'</span><span class="Statement">,</span> <span class="Statement">%</span>(
+                    <span class="Constant">id</span>      <span class="Statement">=&gt;</span> <span class="Identifier">$</span><span class="Identifier">id</span><span class="Statement">,</span>
+                    <span class="Constant">name</span>    <span class="Statement">=&gt;</span> <span class="Identifier">%</span><span class="Identifier">program</span><span class="Special">&lt;</span><span class="Constant">name</span><span class="Special">&gt;</span><span class="Statement">,</span>
+                    <span class="Constant">author</span>  <span class="Statement">=&gt;</span> <span class="Identifier">%</span><span class="Identifier">program</span><span class="Special">&lt;</span><span class="Constant">author</span><span class="Special">&gt;</span><span class="Statement">,</span>
+                    <span class="Constant">program</span> <span class="Statement">=&gt;</span> <span class="Normal">encode-base64</span>(<span class="Identifier">%</span><span class="Identifier">program</span><span class="Special">&lt;</span><span class="Constant">descriptor</span><span class="Special">&gt;</span><span class="Statement">,</span> <span class="Statement">:</span><span class="Constant">str</span>)<span class="Statement">,</span>
+                )<span class="Statement">;</span>
+            }
+            <span class="Statement">else</span> {
+                <span class="Normal">not-found</span><span class="Statement">,</span> <span class="Special">'</span><span class="Constant">application/json</span><span class="Special">'</span><span class="Statement">,</span> <span class="Statement">%;</span>
+            }
+        }
+    }
+
+
+    <span class="Special">my</span> <span class="Identifier">$</span><span class="Identifier">nametag-routes</span> <span class="Statement">=</span> <span class="Normal">route</span> {
+        <span class="Statement">before</span> <span class="Normal">AdminAuth</span><span class="Statement">.</span><span class="Normal">new</span><span class="Statement">;</span>
+
+        <span class="Comment"># Dequeue a program</span>
+        <span class="Normal">post</span> <span class="Statement">-&gt;</span> <span class="Special">'</span><span class="Constant">next-program</span><span class="Special">'</span><span class="Statement">,</span> <span class="Normal">QueueName</span> <span class="Identifier">$</span><span class="Identifier">queue-name</span> {
+            <span class="Normal">check-auth</span> {
+                <span class="Normal">content</span> <span class="Special">'</span><span class="Constant">application/octet</span><span class="Special">'</span><span class="Statement">,</span> <span class="Identifier">$</span><span class="Identifier">db</span><span class="Statement">.</span><span class="Normal">dequeue-program</span>(<span class="Identifier">$</span><span class="Identifier">queue-name</span>)<span class="Statement">;</span>
+            }
+        }
+
+        <span class="Comment"># Get a specific program</span>
+        <span class="Normal">get</span> <span class="Statement">-&gt;</span> <span class="Special">'</span><span class="Constant">program</span><span class="Special">'</span><span class="Statement">,</span> <span class="Normal">AutoID</span> <span class="Identifier">$</span><span class="Identifier">id</span><span class="Statement">,</span> <span class="Special">'</span><span class="Constant">descriptor</span><span class="Special">'</span> {
+            <span class="Normal">check-auth</span> {
+                <span class="Special">my</span> <span class="Identifier">%</span><span class="Identifier">program</span> <span class="Statement">=</span> <span class="Identifier">$</span><span class="Identifier">db</span><span class="Statement">.</span><span class="Normal">load-program</span>(<span class="Identifier">$</span><span class="Identifier">id</span>)<span class="Statement">;</span>
+                <span class="Normal">content</span> <span class="Special">'</span><span class="Constant">application/octet</span><span class="Special">'</span><span class="Statement">,</span> <span class="Identifier">%</span><span class="Identifier">program</span><span class="Special">&lt;</span><span class="Constant">descriptor</span><span class="Special">&gt;</span><span class="Statement">;</span>
+            }
+        }
+    }
+
+    <span class="Normal">route</span> {
+        <span class="Normal">include</span> <span class="Identifier">$</span><span class="Identifier">rate-limited-routes</span><span class="Statement">;</span>
+        <span class="Normal">include</span> <span class="Identifier">$</span><span class="Identifier">japh-routes</span><span class="Statement">;</span>
+        <span class="Normal">include</span> <span class="Identifier">$</span><span class="Identifier">nametag-routes</span><span class="Statement">;</span>
+    }
+}
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->

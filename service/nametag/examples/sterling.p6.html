@@ -1,0 +1,82 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<title>~/Documents/code/0/Mysook/service/nametag/examples/sterling.p6.html</title>
+<meta name="Generator" content="Vim/8.0">
+<meta name="plugin-version" content="vim7.4_v2">
+<meta name="syntax" content="perl6">
+<meta name="settings" content="use_css,pre_wrap,no_foldcolumn,expand_tabs,prevent_copy=">
+<meta name="colorscheme" content="desert256">
+<style type="text/css">
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #c6c6c6; background-color: #000000; }
+body { font-family: monospace; color: #c6c6c6; background-color: #000000; }
+* { font-size: 1em; }
+.Identifier { color: #87ff87; }
+.Comment { color: #87d7ff; }
+.Constant { color: #ffafaf; }
+.Special { color: #ffd7af; }
+.Statement { color: #ffd787; font-weight: bold; }
+.PreProc { color: #d75f5f; }
+.Normal { color: #c6c6c6; background-color: #000000; padding-bottom: 1px; }
+-->
+</style>
+
+<script type='text/javascript'>
+<!--
+
+-->
+</script>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="PreProc">use</span> <span class="Special">v6</span><span class="Statement">;</span>
+
+<span class="Normal">program</span> {
+
+    <span class="Statement">.</span><span class="Normal">fun</span><span class="Statement">:</span> <span class="Special">&quot;</span><span class="Constant">nametag</span><span class="Special">&quot;</span><span class="Statement">,</span> {
+        <span class="Statement">.</span><span class="Normal">local</span><span class="Statement">:</span> <span class="Special">&quot;</span><span class="Constant">foreground</span><span class="Special">&quot;</span><span class="Statement">,</span> <span class="Constant">0</span><span class="Special">x</span><span class="Constant">FFFFFF</span><span class="Statement">;</span>
+        <span class="Statement">.</span><span class="Normal">local</span><span class="Statement">:</span> <span class="Special">&quot;</span><span class="Constant">counter</span><span class="Special">&quot;</span><span class="Statement">;</span>
+        <span class="Statement">.</span><span class="Normal">local</span><span class="Statement">:</span> <span class="Special">&quot;</span><span class="Constant">marquee-pos</span><span class="Special">&quot;</span><span class="Statement">,</span> <span class="Constant">0</span><span class="Statement">;</span>
+
+        <span class="Statement">.</span><span class="Normal">set-urgency</span><span class="Statement">:</span> <span class="Constant">2</span><span class="Statement">;</span>
+        <span class="Statement">.</span><span class="Normal">set-brightness</span><span class="Statement">:</span> <span class="Constant">75</span><span class="Statement">;</span>
+
+        <span class="Statement">.</span><span class="Normal">loop</span><span class="Statement">:</span> <span class="Statement">-&gt;</span> <span class="Identifier">$</span><span class="Identifier">_</span><span class="Statement">,</span> <span class="Statement">*%</span> {
+            <span class="Statement">.</span><span class="Normal">set</span><span class="Statement">:</span> <span class="Special">&quot;</span><span class="Constant">foreground</span><span class="Special">&quot;</span><span class="Statement">,</span> <span class="Statement">.</span><span class="Normal">rand</span> <span class="Statement">+|</span> <span class="Statement">.</span><span class="Normal">num</span>(<span class="Constant">0</span><span class="Special">x</span><span class="Constant">C0C0C0</span>)<span class="Statement">;</span>
+
+            <span class="Statement">.</span><span class="Normal">set</span><span class="Statement">:</span> <span class="Special">&quot;</span><span class="Constant">marquee-pos</span><span class="Special">&quot;</span><span class="Statement">,</span> <span class="Statement">.</span><span class="Normal">width</span><span class="Statement">;</span>
+            <span class="Statement">.</span><span class="Normal">loop</span><span class="Statement">:</span> <span class="Statement">-&gt;</span> <span class="Identifier">$</span><span class="Identifier">_</span><span class="Statement">,</span> <span class="Statement">:</span><span class="Identifier">$</span><span class="Identifier">end-loop</span> {
+
+                <span class="Statement">.</span><span class="Normal">set-foreground</span><span class="Statement">:</span> <span class="Constant">0</span><span class="Statement">;</span>
+                <span class="Statement">.</span><span class="Normal">fill</span><span class="Statement">;</span>
+
+                <span class="Statement">.</span><span class="Normal">set-foreground</span><span class="Statement">:</span> <span class="Statement">.</span><span class="Normal">get</span>(<span class="Special">&quot;</span><span class="Constant">foreground</span><span class="Special">&quot;</span>)<span class="Statement">;</span>
+
+                <span class="Statement">.</span><span class="Normal">set-cursor</span><span class="Statement">:</span> <span class="Statement">.</span><span class="Normal">get</span>(<span class="Special">&quot;</span><span class="Constant">marquee-pos</span><span class="Special">&quot;</span>)<span class="Statement">,</span> <span class="Statement">.</span><span class="Normal">num</span>(<span class="Constant">5</span>)<span class="Statement">;</span>
+                <span class="Statement">.</span><span class="Normal">put-text</span><span class="Statement">:</span> <span class="Special">&quot;</span><span class="Constant">Sterling</span><span class="Special">&quot;</span><span class="Statement">;</span>
+
+                <span class="Statement">.</span><span class="Normal">set</span><span class="Statement">:</span> <span class="Special">&quot;</span><span class="Constant">marquee-pos</span><span class="Special">&quot;</span><span class="Statement">,</span> <span class="Statement">.</span><span class="Normal">get</span>(<span class="Special">&quot;</span><span class="Constant">marquee-pos</span><span class="Special">&quot;</span>) <span class="Statement">-</span> <span class="Statement">.</span><span class="Normal">num</span>(<span class="Constant">1</span>)<span class="Statement">;</span>
+
+                <span class="Statement">.</span><span class="Normal">tick</span><span class="Statement">;</span>
+
+                <span class="Comment"># these are all uint32_ts inside the VM, so fake in</span>
+                <span class="Comment"># 2s-compliment</span>
+                <span class="Statement">.</span><span class="Normal">if</span><span class="Statement">:</span> <span class="Statement">.</span><span class="Normal">get</span>(<span class="Normal">REG_CURSOR_X</span>) <span class="Statement">&gt;</span> <span class="Statement">.</span><span class="Normal">num</span>(<span class="Constant">0</span><span class="Special">x</span><span class="Constant">80000000</span>)<span class="Statement">,</span> {
+                    <span class="Statement">.</span><span class="Normal">goto</span><span class="Statement">:</span> <span class="Identifier">$</span><span class="Identifier">end-loop</span><span class="Statement">;</span>
+                }
+            }
+
+            <span class="Statement">.</span><span class="Normal">tick</span><span class="Statement">;</span>
+            <span class="Statement">.</span><span class="Normal">tick</span><span class="Statement">;</span>
+        }
+    }
+
+    <span class="Statement">.</span><span class="Normal">start</span><span class="Statement">:</span> <span class="Special">&quot;</span><span class="Constant">nametag</span><span class="Special">&quot;</span><span class="Statement">;</span>
+}
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->
