@@ -1,8 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"math"
+	"os"
+	"text/template"
 )
 
 const (
@@ -24,17 +25,38 @@ var (
 	radiusY float64 = imageHeight/2 - panelHeight/2
 )
 
+const tmplcstr = `#include <pgmspace.h>
+#include <stdint.h>
+
+const size_t key_frame_count = {{ .KeyFrames | len }};
+uint16_t key_frames[] = {
+{{- range .KeyFrames}}
+    {{.X}}, {{.Y}}, // k={{.K}}, Θ={{.Theta | printf "%.1f"}}°
+{{- end}}
+};`
+
+type KeyFrame struct {
+	X     int
+	Y     int
+	K     int
+	Theta float64
+}
+
 func main() {
-	fmt.Println("uint16_t key_frames[] = {")
+	keyFrames := make([]KeyFrame, 0, int(360.00/inc))
 	var theta float64
 	k := 0
 	for theta = 0; theta < 359.99; theta += inc {
 		k++
 		x := math.Cos(toRad(theta))*radiusX + imageCenterX - panelCenterX
 		y := math.Sin(toRad(theta))*radiusY + imageCenterY - panelCenterY
-		fmt.Printf("    %.0f, %.0f, // k=%d, Θ=%0.1f°\n", math.Round(x), math.Round(y), k, theta)
+		keyFrames = append(keyFrames, KeyFrame{int(math.Round(x)), int(math.Round(y)), k, theta})
 	}
-	fmt.Println("};")
+
+	tmpl := template.Must(template.New("keyframes").Parse(tmplcstr))
+	tmpl.Execute(os.Stdout, map[string]interface{}{
+		"KeyFrames": keyFrames,
+	})
 }
 
 func toRad(deg float64) float64 {

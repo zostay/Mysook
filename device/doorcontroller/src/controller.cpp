@@ -1,5 +1,9 @@
+#include <string.h>
+
 #include <SPI.h>
 #include <DoorlightSPI.h>
+
+#include "controller.h"
 
 void Controller::start() {
     SPI.begin();
@@ -10,7 +14,7 @@ void Controller::tick() {
     if (keyframe_len == 0)
         return;
 
-    digitalWrite(DOORCSPIN, LOW);
+    digitalWrite(pin, LOW);
 
     for (int y = 0; y < MAX_Y; ++y) {
         if (y == 0) {
@@ -35,5 +39,13 @@ void Controller::tick() {
         SPI.transfer(END_BYTE);
     }
 
-    digitalWrite(DOORCSPIN, LOW);
+    digitalWrite(pin, LOW);
+}
+
+void Controller::load_bmp(const unsigned char *pix, size_t size) {
+    memcpy(bmp, pix, size * 3);
+}
+
+void Controller::load_keyframes(const uint16_t *key_frames, size_t size) {
+    memcpy(frames, key_frames, size*2);
 }

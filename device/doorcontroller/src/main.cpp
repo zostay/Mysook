@@ -1,7 +1,13 @@
+#include <stdint.h>
+
 #include <SPI.h>
+#include <LED.h>
 #include <MC_MDNS.h>
 #include <MC_Network.h>
 #include <MC_Logger.h>
+
+#include "controller.h"
+#include "gimp_image.h"
 
 #include "secrets.h"
 
@@ -9,6 +15,10 @@
 #define BUTTON2PIN 0
 #define BLINKPIN   27
 #define DOORCSPIN  37
+
+extern uint16_t key_frames[];
+extern const size_t key_frame_count;
+extern const gimp_image_t gimp_image;
 
 mysook::MC_Logger<Print> logger(&micros, Serial);
 mysook::MC_Network network(logger);
@@ -37,8 +47,8 @@ void setup() {
 
     door_controller.setup();
 
-    door_controller.load_bmp(gimp_image.pixel_data);
-    door_controller.load_keyframes(key_frames);
+    door_controller.load_bmp(gimp_image.pixel_data, gimp_image.width * gimp_image.height);
+    door_controller.load_keyframes(key_frames, key_frame_count);
 
     Serial.println("Setup done");
 }

@@ -1,4 +1,4 @@
-#include <arduino.h>
+#include <Arduino.h>
 #include <Logger.h>
 #include <cstdarg>
 #include <cstdio>

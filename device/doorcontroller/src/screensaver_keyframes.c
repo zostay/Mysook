@@ -1,4 +1,9 @@
-uint16_t key_frames[] PROGMEM = {
+#include <pgmspace.h>
+#include <stdint.h>
+#include <string.h>
+
+const size_t key_frame_count = 360;
+uint16_t key_frames[] = {
     288, 152, // k=1, Θ=0.0°
     288, 155, // k=2, Θ=1.0°
     288, 157, // k=3, Θ=2.0°

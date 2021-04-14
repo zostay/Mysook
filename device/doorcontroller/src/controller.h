@@ -30,18 +30,18 @@
 #define MAX_KEY_FRAMES 1000
 
 struct key_frame {
-    short x, y;
+    uint16_t x, y;
 };
 
 class Controller : public mysook::Firmware {
 private:
+    mysook::WiFiLED &led;
     mysook::Network &network;
     mysook::Logger &log;
-    mysook::WiFiLED &led;
 
     int pin;
 
-    char bmp[MAX_BMP_SIZE];
+    uint8_t bmp[MAX_BMP_SIZE];
     key_frame frames[MAX_KEY_FRAMES];
     short w = 0, h = 0;
     short keyframe_len = 0;
@@ -63,6 +63,9 @@ public:
 
     virtual void start();
     virtual void tick();
+
+    void load_bmp(const unsigned char *pix, size_t count);
+    void load_keyframes(const uint16_t *frames, size_t count);
 };
 
 #endif//__CONTROLLER_H
