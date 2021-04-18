@@ -49,3 +49,30 @@ void Controller::load_bmp(const unsigned char *pix, size_t size) {
 void Controller::load_keyframes(const uint16_t *key_frames, size_t size) {
     memcpy(frames, key_frames, size*2);
 }
+
+bool Controller::operator() (mysook::Request &req, mysook::Response &res) {
+    if (req.method() != "POST") {
+        return false;
+    }
+
+    if (req.path() == "/bmp") {
+        handle_bmp(req, res);
+        return true;
+    }
+    else if (req.path() == "/frames") {
+        handle_frames(req, res);
+        return true;
+    }
+    else if (req.path() == "/flip") {
+        handle_flip(req, res);
+        return true;
+    }
+
+    return false;
+}
+
+void Controller::handle_bmp(mysook::Request &req, mysook::Response &res) {
+}
+
+void Controller::handle_frames(mysook::Request &req, mysook::Response &res) {
+}

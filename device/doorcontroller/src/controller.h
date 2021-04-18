@@ -4,6 +4,7 @@
 #include <Firmware.h>
 #include <LED.h>
 #include <MC_Network.h>
+#include <WebTools.h>
 
 //   3 bpp * (2^12 * 5^2) pixels
 //   2x51200     51200x2
@@ -66,6 +67,12 @@ public:
 
     void load_bmp(const unsigned char *pix, size_t count);
     void load_keyframes(const uint16_t *frames, size_t count);
+
+    bool operator() (mysook::Request &req, mysook::Response &res);
+
+    void handle_bmp(mysook::Request &req, mysook::Response &res);
+    void handle_frames(mysook::Request &req, mysook::Response &res);
+    void handle_flip(mysook::Request &req, mysook::Response &res);
 };
 
 #endif//__CONTROLLER_H
