@@ -1,6 +1,6 @@
-#include <Adafruit_GFX.h>
 #include <Adafruit_NeoMatrix.h>
 #include <Adafruit_NeoPixel.h>
+#include <Adafruit_I2CDevice.h>
 #include <SPI.h>
 #include <DoorlightSPI.h>
 
@@ -105,10 +105,10 @@ void loop() {
 
         // fill the pixel buffer
         else {
-            pixel[pxpos++] = remapPixel(b);
+            pixel[(int) pxpos++] = b;
             if (pxpos > 3) {
                 // remap 24-bit color to 16-bit 565 color and draw
-                uint16_t c = matrix->Color(pixel[0], pixel[1], pixel[2])
+                uint16_t c = matrix->Color(pixel[0], pixel[1], pixel[2]);
                 matrix->drawPixel(x++, y, c);
                 pxpos = 0;
             }
