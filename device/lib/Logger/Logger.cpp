@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <Logger.h>
-#include <cstdarg>
-#include <cstdio>
+#include <stdarg.h>
+#include <stdio.h>
 
 // Some sinister dark magic is going on here...
 #undef logf

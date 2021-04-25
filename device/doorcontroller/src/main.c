@@ -1,9 +1,44 @@
-#include <pgmspace.h>
-#include <stdint.h>
 #include <string.h>
 
-const size_t key_frame_count = 360;
-uint16_t key_frames[] = {
+#include "esp_system.h"
+#include "driver/spi_master.h"
+#include "driver/timer.h"
+
+#include <DoorlightSPI.h>
+
+// max ESP-IDF timer divider because we don't need ticks every often with a
+// timer running at 80MHz or so.
+#define FLIP_TIMER_DIVIDER  65536 
+#define FLIP_TIMER_SCALAR   (TIMER_BASE_CLK / FLIP_TIMER_DIVIDER)
+#define FLIP_ALARM_FREQ     30
+#define FLIP_ALARM_TICK     (FLIP_TIMER_SCALAR / 30)
+
+#define FLIP_TIMER_GROUP    TIMER_GROUP_0
+#define FLIP_TIMER_TIMER    TIMER_0
+
+#define DOORLIGHT_HOST      HSPI_HOST
+#define DOORLIGHT_DMA_CHAN  2
+
+#define DOORLIGHT_PIN_MISO  HSPI_IOMUX_PIN_NUM_MISO
+#define DOORLIGHT_PIN_MOSI  HSPI_IOMUX_PIN_NUM_MOSI
+#define DOORLIGHT_PIN_CLK   HSPI_IOMUX_PIN_NUM_CLK
+#define DOORLIGHT_PIN_CS    HSPI_IOMUX_PIN_NUM_CS
+
+#define DOORLIGHT_WIDTH     32
+#define DOORLIGHT_HEIGHT    16
+#define DOORLIGHT_BPP       3
+#define DOORLIGHT_LINE_SIZE (DOORLIGHT_WIDTH * DOORLIGHT_BPP) + 2
+
+#define DOORLIGHT_SPI_HZ    (8*1000*1000) // 8MHz (16MHz / 2)
+
+static spi_device_handle_t doorlight_spi;
+
+static short kf_cur = 0;
+static char *bmp;
+static char tx_buffer[DOORLIGHT_HEIGHT][DOORLIGHT_WIDTH+2];
+static short bmp_w, bmp_h;
+static short key_frame_count = 360;
+static short key_frames[] = {
     288, 152, // k=1, Θ=0.0°
     288, 155, // k=2, Θ=1.0°
     288, 157, // k=3, Θ=2.0°
@@ -365,3 +400,109 @@ uint16_t key_frames[] = {
     288, 147, // k=359, Θ=358.0°
     288, 149, // k=360, Θ=359.0°
 };
+
+// Handle flip callbacks which send updates of the display over SPI.
+static bool IRAM_ATTR flip_timer_isr_callback(void *__args) {
+    for (int y = 0; y < DOORLIGHT_HEIGHT; y++) {
+        short kx = key_frames[kf_cur*2];
+        short ky = key_frames[kf_cur*2+1];
+
+        memcpy(tx_buffer[y]+1, bmp+ky*DOORLIGHT_WIDTH+kx, DOORLIGHT_WIDTH);
+        tx_buffer[y][0] = y == 0 ? VSYNC_BYTE : SYNC_BYTE;
+        tx_buffer[y][DOORLIGHT_WIDTH+1] = END_BYTE;
+
+        spi_transaction_t line_tx = {
+            .length    = DOORLIGHT_WIDTH + 2,
+            .tx_buffer = tx_buffer[y],
+            .rx_buffer = NULL,
+        };
+        spi_device_queue_trans(doorlight_spi, &line_tx, portMAX_DELAY);
+    }
+
+    return true;
+}
+
+// Setup the interrupt that handles display updates.
+void init_flip_timer(int group, int timer) {
+    timer_config_t config = {
+        .divider     = FLIP_TIMER_DIVIDER, // slow the timer counter down
+        .counter_dir = TIMER_COUNT_UP,     // count up
+        .counter_en  = TIMER_PAUSE,        // stopped until timer_start()
+        .alarm_en    = TIMER_ALARM_EN,     // enable the alarm
+        .auto_reload = 1,                  // restart the alarm after interrupt
+    };
+    timer_init(group, timer, &config);
+
+    // reset the timer counter to 0
+    timer_set_counter_value(group, timer, 0);
+
+    // setup the alarm to trigger our frame flip interrupt
+    timer_set_alarm_value(group, timer, FLIP_ALARM_TICK);
+
+    // use an interrupt handler to receive the alarm events
+    timer_enable_intr(group, timer);
+    timer_isr_callback_add(group, timer, flip_timer_isr_callback, 0, 0);
+
+    // now start running
+    timer_start(group, timer);
+}
+
+#define BMP_W 320
+#define BMP_H 320
+
+// Create a colorful gradient and key frames to slide around that gradient
+void setup_bmp() {
+    bmp = malloc(BMP_H * BMP_H * DOORLIGHT_BPP);
+
+    for (int x = 0; x < BMP_W; x++) {
+        for (int y = 0; y < BMP_H; y++) {
+            int i = (x + y * BMP_W) * DOORLIGHT_BPP;
+            bmp[i]   = 255 - y * 256 / 320;
+            int d = (x > y) ? x-y : y-x;
+            bmp[i+1] = 255 - d * 256 / 160;
+            bmp[i+2] = 255 - x * 256 / 320;
+        }
+    }
+
+
+}
+
+// Setup communication with the doorlight.
+void init_doorlight() {
+    esp_err_t err;
+
+    spi_bus_config_t bus_config = {
+        .miso_io_num     = DOORLIGHT_PIN_MISO,
+        .mosi_io_num     = DOORLIGHT_PIN_MOSI,
+        .sclk_io_num     = DOORLIGHT_PIN_CLK,
+        .quadwp_io_num   = -1, // disable
+        .quadhd_io_num   = -1, // disable
+        .max_transfer_sz = DOORLIGHT_LINE_SIZE,
+    };
+
+    spi_device_interface_config_t dev_config = {
+        .command_bits   = 0, // skip command phase
+        .address_bits   = 0, // skip address phase
+        .dummy_bits     = 0, // skip dummy phase
+        .clock_speed_hz = DOORLIGHT_SPI_HZ,
+        .mode           = 0, // must match Arduino setDataMode()
+        .spics_io_num   = DOORLIGHT_PIN_CS,
+        .queue_size     = DOORLIGHT_HEIGHT,
+    };
+    
+    // Initialize SPI master on HSPI pins
+    err = spi_bus_initialize(DOORLIGHT_HOST, &bus_config, DOORLIGHT_DMA_CHAN);
+    ESP_ERROR_CHECK(err);
+
+    // Tell the driver how to communicate with the Doorlight Peripheral 
+    err = spi_bus_add_device(DOORLIGHT_HOST, &dev_config, &doorlight_spi);
+    ESP_ERROR_CHECK(err);
+
+    // Setup the base grid and keyframes and queue it up for display.
+    setup_bmp();
+}
+
+void app_main() {
+    init_doorlight();
+    init_flip_timer(FLIP_TIMER_GROUP, FLIP_TIMER_TIMER);
+}

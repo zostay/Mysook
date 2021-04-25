@@ -4,7 +4,7 @@
 #ifndef NOT_FUNCTIONAL
 #include <functional>
 #endif//NOT_FUNCTIONAL
-#include <cstdarg>
+#include <stdarg.h>
 
 namespace mysook {
 
