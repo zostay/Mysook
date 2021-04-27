@@ -1,8 +1,16 @@
+#include <stdio.h>
 #include <string.h>
 
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
+#include "esp_heap_caps.h"
 #include "esp_system.h"
+#include "esp_log.h"
+#include "esp_spiffs.h"
 #include "driver/spi_master.h"
 #include "driver/timer.h"
+#include "driver/gpio.h"
 
 #include <DoorlightSPI.h>
 
@@ -10,10 +18,9 @@
 // timer running at 80MHz or so.
 #define FLIP_TIMER_DIVIDER  65536 
 #define FLIP_TIMER_SCALAR   (TIMER_BASE_CLK / FLIP_TIMER_DIVIDER)
-#define FLIP_ALARM_FREQ     30
-#define FLIP_ALARM_TICK     (FLIP_TIMER_SCALAR / 30)
+#define FLIP_ALARM_TICK     1
 
-#define FLIP_TIMER_GROUP    TIMER_GROUP_0
+#define FLIP_TIMER_GROUP    TIMER_GROUP_1
 #define FLIP_TIMER_TIMER    TIMER_0
 
 #define DOORLIGHT_HOST      HSPI_HOST
@@ -31,12 +38,18 @@
 
 #define DOORLIGHT_SPI_HZ    (8*1000*1000) // 8MHz (16MHz / 2)
 
+static const char *TAG = "DoorCtrl";
+ 
 static spi_device_handle_t doorlight_spi;
+ 
+static volatile short bmp_y = 0;
+static volatile bool loaded_tx_buffer = false;
 
-static short kf_cur = 0;
-static char *bmp;
-static char tx_buffer[DOORLIGHT_HEIGHT][DOORLIGHT_WIDTH+2];
-static short bmp_w, bmp_h;
+static FILE *bmp_file;
+static char tx_buffer[DOORLIGHT_HEIGHT][DOORLIGHT_WIDTH*DOORLIGHT_BPP+2];
+
+static volatile short kf_cur = 0;
+
 static short key_frame_count = 360;
 static short key_frames[] = {
     288, 152, // k=1, Θ=0.0°
@@ -403,20 +416,25 @@ static short key_frames[] = {
 
 // Handle flip callbacks which send updates of the display over SPI.
 static bool IRAM_ATTR flip_timer_isr_callback(void *__args) {
-    for (int y = 0; y < DOORLIGHT_HEIGHT; y++) {
-        short kx = key_frames[kf_cur*2];
-        short ky = key_frames[kf_cur*2+1];
+    if (!loaded_tx_buffer)
+        return true;
 
-        memcpy(tx_buffer[y]+1, bmp+ky*DOORLIGHT_WIDTH+kx, DOORLIGHT_WIDTH);
-        tx_buffer[y][0] = y == 0 ? VSYNC_BYTE : SYNC_BYTE;
-        tx_buffer[y][DOORLIGHT_WIDTH+1] = END_BYTE;
+    spi_transaction_t line_tx = {
+        .length    = DOORLIGHT_WIDTH + 2,
+        .tx_buffer = tx_buffer[bmp_y],
+        .rx_buffer = NULL,
+    };
+    spi_device_queue_trans(doorlight_spi, &line_tx, portMAX_DELAY);
 
-        spi_transaction_t line_tx = {
-            .length    = DOORLIGHT_WIDTH + 2,
-            .tx_buffer = tx_buffer[y],
-            .rx_buffer = NULL,
-        };
-        spi_device_queue_trans(doorlight_spi, &line_tx, portMAX_DELAY);
+    bmp_y++;
+    if (bmp_y >= DOORLIGHT_HEIGHT) {
+        loaded_tx_buffer = false;
+        bmp_y = 0;
+
+        kf_cur++;
+        if (kf_cur >= key_frame_count) {
+            kf_cur = 0;
+        } 
     }
 
     return true;
@@ -424,6 +442,8 @@ static bool IRAM_ATTR flip_timer_isr_callback(void *__args) {
 
 // Setup the interrupt that handles display updates.
 void init_flip_timer(int group, int timer) {
+    ESP_LOGI(TAG, "Flip timer initialization start");
+
     timer_config_t config = {
         .divider     = FLIP_TIMER_DIVIDER, // slow the timer counter down
         .counter_dir = TIMER_COUNT_UP,     // count up
@@ -445,30 +465,72 @@ void init_flip_timer(int group, int timer) {
 
     // now start running
     timer_start(group, timer);
+
+    ESP_LOGI(TAG, "Flip timer initialization complete");
 }
 
 #define BMP_W 320
 #define BMP_H 320
 
 // Create a colorful gradient and key frames to slide around that gradient
-void setup_bmp() {
-    bmp = malloc(BMP_H * BMP_H * DOORLIGHT_BPP);
+void init_filesystem() {
+    ESP_LOGI(TAG, "SPIFFS initialization start");
 
-    for (int x = 0; x < BMP_W; x++) {
-        for (int y = 0; y < BMP_H; y++) {
-            int i = (x + y * BMP_W) * DOORLIGHT_BPP;
-            bmp[i]   = 255 - y * 256 / 320;
-            int d = (x > y) ? x-y : y-x;
-            bmp[i+1] = 255 - d * 256 / 160;
-            bmp[i+2] = 255 - x * 256 / 320;
+    esp_vfs_spiffs_conf_t spiffs_config = {
+        .base_path = "/spiffs",
+        .partition_label = NULL,
+        .max_files = 12,
+    };
+
+    // register file system
+    esp_err_t ret = esp_vfs_spiffs_register(&spiffs_config);
+
+    if (ret != ESP_OK) {
+        if (ret == ESP_FAIL) {
+            ESP_LOGE(TAG, "Failed to mount or format filesystem");
+        } else if (ret == ESP_ERR_NOT_FOUND) {
+            ESP_LOGE(TAG, "Failed to find SPIFFS partition");
+        } else {
+            ESP_LOGE(TAG, "Failed to initialize SPIFFS (%s)", esp_err_to_name(ret));
         }
+        return;
     }
 
+    ESP_LOGI(TAG, "SPIFFS initialization complete");
+    ESP_LOGI(TAG, "Open screensaver.data start");
 
+    bmp_file = fopen("/spiffs/screensaver.data", "r");
+    if (bmp_file == NULL) {
+        ESP_LOGE(TAG, "Failed to open screensaver.data file.");
+        return;
+    }
+
+    ESP_LOGI(TAG, "Open screensaver.data complete");
+
+//    int size = BMP_W * BMP_H * DOORLIGHT_BPP;
+//    bmp = heap_caps_malloc(size, MALLOC_CAP_SPIRAM);
+//    if (bmp == NULL) {
+//        ESP_LOGE(TAG, "Failure to allocate %d bytes for bmp", size);
+//        return;
+//    }
+//
+//    ESP_LOGI(TAG, "Allocated %d bytes for bmp", size);
+//
+//    for (int x = 0; x < BMP_W; x++) {
+//        for (int y = 0; y < BMP_H; y++) {
+//            ESP_LOGI(TAG, "Setup BMP (%d, %d)", x, y);
+//            int i = (x + y * BMP_W) * DOORLIGHT_BPP;
+//            bmp[i]   = 255 - y * 256 / 320;
+//            int d = (x > y) ? x-y : y-x;
+//            bmp[i+1] = 255 - d * 256 / 160;
+//            bmp[i+2] = 255 - x * 256 / 320;
+//        }
+//    }
 }
 
 // Setup communication with the doorlight.
 void init_doorlight() {
+    ESP_LOGI(TAG, "SPI initialization start");
     esp_err_t err;
 
     spi_bus_config_t bus_config = {
@@ -498,11 +560,42 @@ void init_doorlight() {
     err = spi_bus_add_device(DOORLIGHT_HOST, &dev_config, &doorlight_spi);
     ESP_ERROR_CHECK(err);
 
-    // Setup the base grid and keyframes and queue it up for display.
-    setup_bmp();
+    ESP_LOGI(TAG, "SPI initialization complete");
+}
+
+void load_tx_buffer() {
+    ESP_LOGI(TAG, "key_frame %d loading", kf_cur);
+
+    for (int y = 0; y < DOORLIGHT_HEIGHT; y++) {
+        short kx = key_frames[kf_cur*2];
+        short ky = key_frames[kf_cur*2+1];
+
+        fseek(bmp_file, (ky*DOORLIGHT_WIDTH+kx)*DOORLIGHT_BPP, SEEK_SET);
+        fread(tx_buffer[y]+1, DOORLIGHT_BPP, DOORLIGHT_WIDTH, bmp_file);
+
+        tx_buffer[y][0] = y == 0 ? VSYNC_BYTE : SYNC_BYTE;
+        tx_buffer[y][DOORLIGHT_WIDTH+1] = END_BYTE;
+    }
+
+    ESP_LOGI(TAG, "key_frame %d loaded", kf_cur);
+
+    loaded_tx_buffer = true;
 }
 
 void app_main() {
+    ESP_LOGI(TAG, "App boot start");
+
     init_doorlight();
+    init_filesystem();
+    load_tx_buffer();
     init_flip_timer(FLIP_TIMER_GROUP, FLIP_TIMER_TIMER);
+
+    ESP_LOGI(TAG, "App boot complete");
+
+    while (1) {
+        if (loaded_tx_buffer)
+            continue;
+
+        load_tx_buffer();
+    }
 }
