@@ -5,10 +5,13 @@
 #include <DoorlightSPI.h>
 
 #define MATRIX_PIN 6
+#define BLINK_PIN  13
 
-#define BRIGHTNESS 32
+#define BRIGHTNESS 16
 
 #define BUFFER_SIZE 294
+
+int blink = 0;
 
 // current ring buffer write position
 volatile short wpos = 0;
@@ -53,6 +56,14 @@ void setup() {
 
     SPCR |= _BV(SPE); // Switch to SPI slave
     SPI.attachInterrupt(); // enables SPI slave interrupt
+
+    for (int y = 0; y < MAX_Y; y++) {
+        for (int x = 0; x < MAX_X; x++) {
+            uint16_t c = matrix->Color(0xFF, 0x00, 0x00);
+            matrix->drawPixel(x, y, c);
+        }
+    }
+    matrix->show();
 }
 
 // SPI interrupt handler
@@ -85,12 +96,16 @@ void loop() {
         // read the next ready byte
         char b = buf[rstart++];
 
-        // end byte is ignored by us
-        if (b == END_BYTE)
+        // end byte triggers show
+        if (b == END_BYTE) {
+            matrix->show();
             continue;
+        }
 
         // perform a horizontal sync
         else if (b == SYNC_BYTE) {
+            blink = !blink;
+            digitalWrite(BLINK_PIN, blink);
             pxpos = 0;
             x = 0;
             y++;
