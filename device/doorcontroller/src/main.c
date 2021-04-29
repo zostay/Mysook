@@ -4,6 +4,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
+#include "esp_event.h"
 #include "esp_heap_caps.h"
 #include "esp_system.h"
 #include "esp_log.h"
@@ -16,9 +17,10 @@
 
 // max ESP-IDF timer divider because we don't need ticks every often with a
 // timer running at 80MHz or so.
-#define FLIP_TIMER_DIVIDER  65536 
-#define FLIP_TIMER_SCALAR   (TIMER_BASE_CLK / FLIP_TIMER_DIVIDER)
-#define FLIP_ALARM_TICK     1
+#define FLIP_TIMER_DIVIDER   65536 
+#define FLIP_TIMER_SCALAR    (TIMER_BASE_CLK / FLIP_TIMER_DIVIDER)
+#define FLIP_ALARM_HERTZ     30
+#define FLIP_ALARM_TICK      (FLIP_TIMER_SCALAR / FLIP_ALARM_HERTZ)
 
 #define FLIP_TIMER_GROUP    TIMER_GROUP_1
 #define FLIP_TIMER_TIMER    TIMER_0
@@ -36,19 +38,56 @@
 #define DOORLIGHT_BPP       3
 #define DOORLIGHT_LINE_SIZE (DOORLIGHT_WIDTH * DOORLIGHT_BPP) + 2
 
-#define DOORLIGHT_SPI_HZ    (8*1000*1000) // 8MHz (16MHz / 2)
+#define DOORLIGHT_SPI_HZ    (500*1000) // 8MHz (16MHz / 2)
+
+ESP_EVENT_DEFINE_BASE(EVT_TX_BUFFER);
+
+enum {
+    EVT_TXB_LOAD,
+    EVT_TXB_SEND,
+};
 
 static const char *TAG = "DoorCtrl";
+static esp_event_loop_handle_t app_loop;
  
 static spi_device_handle_t doorlight_spi;
  
-static volatile short bmp_y = 0;
 static volatile bool loaded_tx_buffer = false;
 
 static FILE *bmp_file;
 static char tx_buffer[DOORLIGHT_HEIGHT][DOORLIGHT_WIDTH*DOORLIGHT_BPP+2];
 
-static volatile short kf_cur = 0;
+static short g_kf_cur = 0;
+
+// color is capped weird because of SYNC codes
+static char color_map[256] = {
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 
+    10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 
+    20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 
+    30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 
+    40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 
+    50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 
+    60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 
+    70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 
+    80, 81, 82, 83, 84, 85, 85, 86, 87, 88, 
+    89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 
+    99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 
+    109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 
+    119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 
+    129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 
+    139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 
+    149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 
+    159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 
+    169, 169, 170, 171, 172, 173, 174, 175, 176, 177, 
+    178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 
+    188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 
+    198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 
+    208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 
+    218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 
+    228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 
+    238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 
+    248, 249, 250, 251, 252, 253,
+};
 
 static short key_frame_count = 360;
 static short key_frames[] = {
@@ -416,26 +455,14 @@ static short key_frames[] = {
 
 // Handle flip callbacks which send updates of the display over SPI.
 static bool IRAM_ATTR flip_timer_isr_callback(void *__args) {
-    if (!loaded_tx_buffer)
-        return true;
+    esp_event_post_to(app_loop, EVT_TX_BUFFER, EVT_TXB_SEND, &g_kf_cur, sizeof(g_kf_cur), 0);
 
-    spi_transaction_t line_tx = {
-        .length    = DOORLIGHT_WIDTH + 2,
-        .tx_buffer = tx_buffer[bmp_y],
-        .rx_buffer = NULL,
-    };
-    spi_device_queue_trans(doorlight_spi, &line_tx, portMAX_DELAY);
+    g_kf_cur++;
+    if (g_kf_cur >= key_frame_count) {
+        g_kf_cur = 0;
+    } 
 
-    bmp_y++;
-    if (bmp_y >= DOORLIGHT_HEIGHT) {
-        loaded_tx_buffer = false;
-        bmp_y = 0;
-
-        kf_cur++;
-        if (kf_cur >= key_frame_count) {
-            kf_cur = 0;
-        } 
-    }
+    esp_event_post_to(app_loop, EVT_TX_BUFFER, EVT_TXB_LOAD, &g_kf_cur, sizeof(g_kf_cur), 0);
 
     return true;
 }
@@ -563,7 +590,7 @@ void init_doorlight() {
     ESP_LOGI(TAG, "SPI initialization complete");
 }
 
-void load_tx_buffer() {
+void load_tx_buffer(short kf_cur) {
     ESP_LOGI(TAG, "key_frame %d loading", kf_cur);
 
     for (int y = 0; y < DOORLIGHT_HEIGHT; y++) {
@@ -572,6 +599,10 @@ void load_tx_buffer() {
 
         fseek(bmp_file, (ky*DOORLIGHT_WIDTH+kx)*DOORLIGHT_BPP, SEEK_SET);
         fread(tx_buffer[y]+1, DOORLIGHT_BPP, DOORLIGHT_WIDTH, bmp_file);
+
+        for (int i = 0; i < DOORLIGHT_WIDTH*DOORLIGHT_BPP; i++) {
+            tx_buffer[y][i+1] = color_map[ (int) tx_buffer[y][i+1] ];
+        }
 
         tx_buffer[y][0] = y == 0 ? VSYNC_BYTE : SYNC_BYTE;
         tx_buffer[y][DOORLIGHT_WIDTH+1] = END_BYTE;
@@ -582,20 +613,60 @@ void load_tx_buffer() {
     loaded_tx_buffer = true;
 }
 
+void send_tx_buffer(short kf_cur) {
+    //ESP_LOGI(TAG, "key_frame %d sending", kf_cur);
+
+    for (int bmp_y = 0; bmp_y < DOORLIGHT_HEIGHT; bmp_y++) {
+        spi_transaction_t line_tx = {
+            .flags     = 0,
+            .length    = (DOORLIGHT_WIDTH + 2) * 8,
+            .tx_buffer = tx_buffer[bmp_y],
+            .rx_buffer = NULL,
+        };
+        spi_device_polling_transmit(doorlight_spi, &line_tx);
+    }
+
+    //ESP_LOGI(TAG, "key_frame %d sent", kf_cur);
+}
+
+void evh_load_tx_buffer(void *handler_arg, esp_event_base_t base, int32_t id, void *event_data) {
+    short *kf_cur = (short *) event_data;
+    load_tx_buffer(*kf_cur);
+}
+
+void evh_send_tx_buffer(void *handler_arg, esp_event_base_t base, int32_t id, void *event_data) {
+    short *kf_cur = (short *) event_data;
+    send_tx_buffer(*kf_cur);
+}
+
+static void main_loop(void *args) {
+    while (1) {
+        esp_event_loop_run(app_loop, 100);
+    }
+}
+
 void app_main() {
     ESP_LOGI(TAG, "App boot start");
 
     init_doorlight();
     init_filesystem();
-    load_tx_buffer();
+    load_tx_buffer(0);
     init_flip_timer(FLIP_TIMER_GROUP, FLIP_TIMER_TIMER);
+
+    esp_event_loop_args_t loop_config = {
+        .queue_size      = 10,
+        .task_name       = "main_loop_task",
+        .task_priority   = uxTaskPriorityGet(NULL),
+        .task_stack_size = 2048,
+        .task_core_id    = tskNO_AFFINITY,
+    };
+
+    esp_event_loop_create(&loop_config, &app_loop);
+
+    esp_event_handler_register_with(app_loop, EVT_TX_BUFFER, EVT_TXB_LOAD, evh_load_tx_buffer, NULL);
+    esp_event_handler_register_with(app_loop, EVT_TX_BUFFER, EVT_TXB_SEND, evh_send_tx_buffer, NULL);
 
     ESP_LOGI(TAG, "App boot complete");
 
-    while (1) {
-        if (loaded_tx_buffer)
-            continue;
-
-        load_tx_buffer();
-    }
+    xTaskCreate(main_loop, "main_loop", 2048, NULL, uxTaskPriorityGet(NULL), NULL);
 }

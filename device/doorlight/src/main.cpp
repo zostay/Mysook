@@ -7,10 +7,11 @@
 #define MATRIX_PIN 6
 #define BLINK_PIN  13
 
-#define BRIGHTNESS 16
+#define BRIGHTNESS 12
 
-#define BUFFER_SIZE 294
+#define BUFFER_SIZE 500
 
+int blink_count = 0;
 int blink = 0;
 
 // current ring buffer write position
@@ -24,14 +25,14 @@ volatile short rstart = 0;
 volatile short rend = 0;
 
 // ring buffer for incoming pixel data
-char buf[BUFFER_SIZE];
+unsigned char buf[BUFFER_SIZE];
 
 // current (x, y) being drawn
 short x = 0;
 short y = 0;
 
 // ring buffer for the current pixel, 24-bit color in RGB order
-char pixel[3];
+unsigned char pixel[3];
 char pxpos = 0;
 
 // Updates the hardware display
@@ -54,12 +55,15 @@ void setup() {
     // Configure for SPI slave
     pinMode(MISO, OUTPUT);
 
+    SPI.setClockDivider(SPI_CLOCK_DIV32);
+    SPI.setDataMode(SPI_MODE0);
+
     SPCR |= _BV(SPE); // Switch to SPI slave
     SPI.attachInterrupt(); // enables SPI slave interrupt
 
     for (int y = 0; y < MAX_Y; y++) {
         for (int x = 0; x < MAX_X; x++) {
-            uint16_t c = matrix->Color(0xFF, 0x00, 0x00);
+            uint16_t c = matrix->Color(0x00, 0x00, 0xFD);
             matrix->drawPixel(x, y, c);
         }
     }
@@ -83,7 +87,7 @@ ISR (SPI_STC_vect) {
 
 void loop() {
     // reset the read head to beginning of buffer on wraparound
-    if (rstart >= BUFFER_SIZE)
+    if (rstart >= BUFFER_SIZE) 
         rstart = 0;
 
     // effective read end handles wraparound in the ring buffer
@@ -94,7 +98,7 @@ void loop() {
     // read the data ready in the ring buffer
     while (rstart < erend) {
         // read the next ready byte
-        char b = buf[rstart++];
+        unsigned char b = buf[rstart++];
 
         // end byte triggers show
         if (b == END_BYTE) {
@@ -104,8 +108,6 @@ void loop() {
 
         // perform a horizontal sync
         else if (b == SYNC_BYTE) {
-            blink = !blink;
-            digitalWrite(BLINK_PIN, blink);
             pxpos = 0;
             x = 0;
             y++;
@@ -116,6 +118,11 @@ void loop() {
             x = 0;
             y = 0;
             pxpos = 0;
+
+            if (blink_count++ % 30 == 0) {
+                blink = !blink;
+                digitalWrite(BLINK_PIN, blink);
+            }
         }
 
         // fill the pixel buffer
@@ -124,6 +131,10 @@ void loop() {
             if (pxpos > 3) {
                 // remap 24-bit color to 16-bit 565 color and draw
                 uint16_t c = matrix->Color(pixel[0], pixel[1], pixel[2]);
+                uint32_t r = pixel[0];
+                uint32_t g = pixel[1];
+                uint32_t b = pixel[2];
+                matrix->setPassThruColor((r << 16) | (g << 8) | b);
                 matrix->drawPixel(x++, y, c);
                 pxpos = 0;
             }
