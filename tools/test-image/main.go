@@ -50,7 +50,7 @@ func main() {
 		for x := 0; x < W; x++ {
 			ti.Set(x, y, testColors[c])
 
-			if x%60 == 0 {
+			if x%80 == 0 {
 				c = (c + DC) % len(testColors)
 			}
 		}
