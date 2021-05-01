@@ -5,10 +5,37 @@
 #include <MC_Logger.h>
 
 #define MATRIX_PIN 6
+#define BLINK_PIN  13
 
 #define BRIGHTNESS 16
 
+#define BUFFER_SIZE 500
+
 #define N_LEDS (MAX_X*MAX_Y)
+
+int blink_count = 0;
+int blink = 0;
+
+// current ring buffer write position
+volatile short wpos = 0;
+
+// current area ready for reading in the ring buffer:
+// * rstart = rend: no data ready to read
+// * rstart < rend: ready to read from rstart to rend
+// * rstart > rend: ready to read from rstart to BUFFER_SIZE, then rstart := 0
+volatile short rstart = 0;
+volatile short rend = 0;
+
+// ring buffer for incoming pixel data
+unsigned char buf[BUFFER_SIZE];
+
+// current (x, y) being drawn
+short x = 0;
+short y = 0;
+
+// ring buffer for the current pixel, 24-bit color in RGB order
+unsigned char pixel[3];
+char pxpos = 0;
 
 // Setup the hardware display
 Adafruit_NeoPixel matrix(N_LEDS, MATRIX_PIN, NEO_GRB + NEO_KHZ800);
@@ -16,29 +43,7 @@ Adafruit_NeoPixel matrix(N_LEDS, MATRIX_PIN, NEO_GRB + NEO_KHZ800);
 // TODO Why does initializing this kill the NeoMatrix!?
 //mysook::MC_Logger<Print> logger(&micros, Serial);
 
-//    0   1   2   3
-// 0  248 247 232 231
-// 1  249 246 233 230
-// 2  250 245 234 229
-// 3  251 244 235 228
-// 4  252 243 236 227
-// 5  253 242 237 226
-// 6  254 241 238 225
-// 7  255 240 239 224
-// 8
-// 9
-// 10
-// 11
-// 12
-// 13
-// 14
-// 15
-// 
-// 256 - (x + 1) * 8 + y
-// 256 - (x + 1) * 8 + (7 - y)
-// 256 + x * 8 + y
-// 256 + x * 8 + (7 - y)
-
+// Map pixels into the matrix grid
 void drawPixel(uint8_t x, uint8_t y, uint32_t c) {
     if (y >= 16 || x >= 32) return;
 
@@ -57,26 +62,6 @@ void drawPixel(uint8_t x, uint8_t y, uint32_t c) {
         i = xi + (MATRIX_HEIGHT - (y % MATRIX_HEIGHT) - 1);
     }
 
-    //Serial.println(i);
-
-    // if (x == 0 && y == 0) {
-    //     i = 248;
-    // }
-    // else if (x == 1 && y == 0) {
-    //     i = 247;
-    // }
-    // else if (x == 0 && y == 1) {
-    //     i = 249;
-    // }
-    // else if (x == 0 && y == 8) {
-    //     i = 256;
-    // }
-    // else if (x == 16 && y == 0) {
-    //     i = 120;
-    // }
-    // else {
-    //     i = 0;
-    // }
     matrix.setPixelColor(i, c);
 }
 
@@ -90,24 +75,34 @@ void setup() {
     // Configure for SPI slave
     pinMode(MISO, OUTPUT);
 
-    SPI.setClockDivider(SPI_CLOCK_DIV32);
+    SPI.setClockDivider(SPI_CLOCK_DIV64);
     SPI.setDataMode(SPI_MODE0);
 
     SPCR |= _BV(SPE); // Switch to SPI slave
     SPI.attachInterrupt(); // enables SPI slave interrupt
 
-    // for (int y = 0; y < MAX_Y; y++) {
-    //     for (int x = 0; x < MAX_X; x++) {
-    //         uint32_t c = Adafruit_NeoPixel::Color(0x00, 0x00, 0xFF);
-    //         matrix.setPassThruColor(c);
-    //         matrix.drawPixel(x, y, 0);
-    //     }
-    // }
-
     //logger.logf_ln("BOOT");
-    Serial.println("BOOT");
+    Serial.println("Boot Complete");
 }
 
+// SPI interrupt handler
+ISR (SPI_STC_vect) {
+    // write to the current position of the ring buffer
+    buf[wpos] = SPDR;
+
+    //Serial.println(buf[wpos], HEX);
+
+    // when we receive the end byte signal, mark the buffer readable
+    if (buf[wpos] == END_BYTE) {
+        rend = wpos;
+    }
+
+    // reset the write head to beginning of buffer on wraparound
+    if (++wpos >= BUFFER_SIZE)
+        wpos = 0;
+}
+
+// simple chase function for testing
 static void chase(uint32_t c) {
     uint8_t lx = -1, ly = -1;
     for (uint8_t y = 0; y < 16; y++) {
@@ -125,20 +120,75 @@ static void chase(uint32_t c) {
     drawPixel(lx, ly, 0);
     matrix.show();
 }
-
-static void testPattern() {
-    matrix.clear();
-    drawPixel(0, 0, matrix.Color(0xFF, 0x00, 0x00));
-    drawPixel(1, 0, matrix.Color(0xFF, 0xFF, 0x00));
-    drawPixel(0, 1, matrix.Color(0x00, 0xFF, 0x00));
-    drawPixel(16, 0, matrix.Color(0x00, 0xFF, 0xFF));
-    drawPixel(0, 8, matrix.Color(0x00, 0x00, 0xFF));
-    matrix.show();
-}
+// 
+// // simple test pattern for testing
+// static void testPattern() {
+//     matrix.clear();
+//     drawPixel(0, 0, matrix.Color(0xFF, 0x00, 0x00));
+//     drawPixel(1, 0, matrix.Color(0xFF, 0xFF, 0x00));
+//     drawPixel(0, 1, matrix.Color(0x00, 0xFF, 0x00));
+//     drawPixel(16, 0, matrix.Color(0x00, 0xFF, 0xFF));
+//     drawPixel(0, 8, matrix.Color(0x00, 0x00, 0xFF));
+//     matrix.show();
+// }
 
 void loop() {
+    Serial.println("LOOP");
     chase(Adafruit_NeoPixel::Color(128, 128, 128));
+    Serial.println("CHASE");
     //testPattern();
     //delay(2);
+
+    // reset the read head to beginning of buffer on wraparound
+    if (rstart >= BUFFER_SIZE) 
+        rstart = 0;
+
+    // effective read end handles wraparound in the ring buffer
+    short erend = rend;
+    if (erend < rstart)
+        erend = BUFFER_SIZE;
+
+    // read the data ready in the ring buffer
+    while (rstart < erend) {
+        // read the next ready byte
+        unsigned char b = buf[rstart++];
+
+        // end byte triggers show
+        if (b == END_BYTE) {
+            continue;
+        }
+
+        // perform a horizontal sync
+        else if (b == SYNC_BYTE) {
+            pxpos = 0;
+            x = 0;
+            y++;
+        }
+        
+        // perform a vertical sync
+        else if (b == VSYNC_BYTE) {
+            x = 0;
+            y = 0;
+            pxpos = 0;
+
+            matrix.show();
+            if (blink_count++ % 30 == 0) {
+                blink = !blink;
+                Serial.println("BLINKY");
+                //digitalWrite(BLINK_PIN, blink);
+            }
+        }
+
+        // fill the pixel buffer
+        else {
+            pixel[(int) pxpos++] = b;
+            if (pxpos > 3) {
+                // remap 24-bit color to 16-bit 565 color and draw
+                uint32_t c = matrix.Color(pixel[0], pixel[1], pixel[2]);
+                drawPixel(x++, y, c);
+                pxpos = 0;
+            }
+        }
+    }
 }
 
