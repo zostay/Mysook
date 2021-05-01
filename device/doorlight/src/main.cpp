@@ -7,9 +7,9 @@
 #define MATRIX_PIN 6
 #define BLINK_PIN  13
 
-#define BRIGHTNESS 16
+#define BRIGHTNESS 1
 
-#define BUFFER_SIZE 500
+#define BUFFER_SIZE 200
 
 #define N_LEDS (MAX_X*MAX_Y)
 
@@ -27,7 +27,7 @@ volatile short rstart = 0;
 volatile short rend = 0;
 
 // ring buffer for incoming pixel data
-unsigned char buf[BUFFER_SIZE];
+unsigned char *buf;
 
 // current (x, y) being drawn
 short x = 0;
@@ -38,6 +38,7 @@ unsigned char pixel[3];
 char pxpos = 0;
 
 // Setup the hardware display
+volatile bool matrix_ready = false;
 Adafruit_NeoPixel matrix(N_LEDS, MATRIX_PIN, NEO_GRB + NEO_KHZ800);
 
 // TODO Why does initializing this kill the NeoMatrix!?
@@ -75,11 +76,23 @@ void setup() {
     // Configure for SPI slave
     pinMode(MISO, OUTPUT);
 
-    SPI.setClockDivider(SPI_CLOCK_DIV64);
+    SPI.setClockDivider(SPI_CLOCK_DIV2);
     SPI.setDataMode(SPI_MODE0);
+
+    buf = new unsigned char[BUFFER_SIZE];
 
     SPCR |= _BV(SPE); // Switch to SPI slave
     SPI.attachInterrupt(); // enables SPI slave interrupt
+
+    // Setup the timer interrupt
+    TCCR0A = 0; // set timer 0 register A to 0
+    TCCR0B = 0; // set timer 0 register B to 0
+    TCNT0 = 0; // set timer 0 counter to 0
+    OCR0A = 156; // 100Hz, setup alarm subdivide: 16*1000*1000 / 156*1024 - 1
+    TCCR0A |= (1 << WGM01); // auto reset the counter                 ▲
+    TCCR0B |= (1 << CS02) | (1 << CS00); // prescalar set to 1024 ────┘
+    TIMSK0 |= (1 << OCIE0A); // enable interrupt
+    sei(); // allow interrupts
 
     //logger.logf_ln("BOOT");
     Serial.println("Boot Complete");
@@ -93,9 +106,7 @@ ISR (SPI_STC_vect) {
     //Serial.println(buf[wpos], HEX);
 
     // when we receive the end byte signal, mark the buffer readable
-    if (buf[wpos] == END_BYTE) {
-        rend = wpos;
-    }
+    rend = wpos;
 
     // reset the write head to beginning of buffer on wraparound
     if (++wpos >= BUFFER_SIZE)
@@ -104,21 +115,30 @@ ISR (SPI_STC_vect) {
 
 // simple chase function for testing
 static void chase(uint32_t c) {
-    uint8_t lx = -1, ly = -1;
-    for (uint8_t y = 0; y < 16; y++) {
-        for (uint8_t x = 0; x < 32; x++) {
-            if (lx >= 0 && ly >= 0)
-                drawPixel(lx, ly, 0);
+    static uint8_t cx = 0, cy = 0;
+    static uint8_t lx = -1, ly = -1;
 
-            drawPixel(x, y, c);
-            lx = x;
-            ly = y;
-            matrix.show();
-            delay(2);
-        }
-    }
+    if (lx >= 0 && ly >= 0)
+        drawPixel(lx, ly, 0);
+
+    drawPixel(cx, cy, c);
+    Serial.print("("); Serial.print(cx, DEC); 
+    Serial.print(", "); Serial.print(cy, DEC); Serial.println(")");
+    lx = cx++;
+    ly = cy;
     drawPixel(lx, ly, 0);
-    matrix.show();
+
+    if (cx >= MAX_X) {
+        cx = 0;
+        cy++;
+    }
+
+    if (cy >= MAX_Y) {
+        cy = 0;
+    }
+
+    matrix_ready = true;
+    //matrix.show();
 }
 // 
 // // simple test pattern for testing
@@ -132,10 +152,19 @@ static void chase(uint32_t c) {
 //     matrix.show();
 // }
 
+// Draw on the panel when ready. We use an interrupt because neopixels don't
+// like having their writes interrupted.
+ISR (TIMER0_COMPA_vect) { 
+    if (matrix_ready) {
+        matrix.show();
+        matrix_ready = false;
+    }
+}
+
 void loop() {
-    Serial.println("LOOP");
+    //Serial.println("LOOP");
     chase(Adafruit_NeoPixel::Color(128, 128, 128));
-    Serial.println("CHASE");
+    //Serial.println("CHASE");
     //testPattern();
     //delay(2);
 
@@ -171,7 +200,9 @@ void loop() {
             y = 0;
             pxpos = 0;
 
-            matrix.show();
+            //matrix.show();
+            matrix_ready = true;
+            
             if (blink_count++ % 30 == 0) {
                 blink = !blink;
                 Serial.println("BLINKY");
