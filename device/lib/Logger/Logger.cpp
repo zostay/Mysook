@@ -9,7 +9,7 @@
 using namespace mysook;
 
 #define PRINT_BUF   1024
-char buf[PRINT_BUF];
+static char buf[PRINT_BUF];
 
 void Logger::vlogf_ln(const char *fmt, va_list args) {
     vsnprintf(buf, PRINT_BUF - 2, fmt, args);

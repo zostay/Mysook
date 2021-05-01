@@ -4,7 +4,7 @@
 #define MATRIX_HEIGHT 8
 #define MATRIX_WIDTH  32
 
-#define TILE_HEIGHT 1
+#define TILE_HEIGHT 2
 #define TILE_WIDTH  1
 
 // pixels may not contain these values, so pixel intensity is clipped to 0xFC
