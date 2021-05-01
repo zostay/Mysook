@@ -9,7 +9,7 @@
 
 #define BRIGHTNESS 1
 
-#define BUFFER_SIZE 200
+#define BUFFER_SIZE 50
 
 #define N_LEDS (MAX_X*MAX_Y)
 
@@ -80,6 +80,8 @@ void setup() {
     SPI.setDataMode(SPI_MODE0);
 
     buf = new unsigned char[BUFFER_SIZE];
+    if (buf == NULL)
+        Serial.println("OUT OF MEMORY");
 
     SPCR |= _BV(SPE); // Switch to SPI slave
     SPI.attachInterrupt(); // enables SPI slave interrupt
@@ -111,6 +113,9 @@ ISR (SPI_STC_vect) {
     // reset the write head to beginning of buffer on wraparound
     if (++wpos >= BUFFER_SIZE)
         wpos = 0;
+
+    if (++wpos > rstart)
+        Serial.println("OVERFLOW");
 }
 
 // simple chase function for testing
