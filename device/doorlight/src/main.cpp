@@ -33,11 +33,11 @@ Adafruit_NeoPixel matrix(N_LEDS, MATRIX_PIN, NEO_GRB + NEO_KHZ800);
 
 // Map pixels into the matrix grid
 void drawPixel(uint8_t x, uint8_t y, uint32_t c) {
-    if (y >= 16 || x >= 32) return;
-
     Serial.print("("); Serial.print(x, DEC); 
     Serial.print(", "); Serial.print(y, DEC); 
     Serial.print(") <- "); Serial.println(c, HEX);
+
+    if (y >= 16 || x >= 32) return;
 
     int xi, i;
     if (y < 8) {
@@ -91,6 +91,7 @@ void setup() {
 ISR (SPI_STC_vect) {
     // write to the pixel buffer
     byte b = SPDR;
+    //Serial.println(b, HEX);
     if (b == SYNC_BYTE) {
         pxpos = 0;
         x = 0;
@@ -126,11 +127,11 @@ static void chase(uint32_t c) {
         drawPixel(lx, ly, 0);
 
     drawPixel(cx, cy, c);
-    lx = cx++;
+    lx = cx;
     ly = cy;
     drawPixel(lx, ly, 0);
 
-    if (cx >= MAX_X) {
+    if (++cx >= MAX_X) {
         cx = 0;
         cy++;
     }
@@ -140,6 +141,7 @@ static void chase(uint32_t c) {
     }
 
     matrix_ready = true;
+    delay(25);
     //matrix.show();
 }
 // 
