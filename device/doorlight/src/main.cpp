@@ -16,26 +16,13 @@
 int blink_count = 0;
 int blink = 0;
 
-// current ring buffer write position
-volatile short wpos = 0;
-
-// current area ready for reading in the ring buffer:
-// * rstart = rend: no data ready to read
-// * rstart < rend: ready to read from rstart to rend
-// * rstart > rend: ready to read from rstart to BUFFER_SIZE, then rstart := 0
-volatile short rstart = 0;
-volatile short rend = 0;
-
-// ring buffer for incoming pixel data
-unsigned char *buf;
-
 // current (x, y) being drawn
 short x = 0;
 short y = 0;
 
 // ring buffer for the current pixel, 24-bit color in RGB order
-unsigned char pixel[3];
-char pxpos = 0;
+byte pixel[3];
+int pxpos = 0;
 
 // Setup the hardware display
 volatile bool matrix_ready = false;
@@ -47,6 +34,10 @@ Adafruit_NeoPixel matrix(N_LEDS, MATRIX_PIN, NEO_GRB + NEO_KHZ800);
 // Map pixels into the matrix grid
 void drawPixel(uint8_t x, uint8_t y, uint32_t c) {
     if (y >= 16 || x >= 32) return;
+
+    Serial.print("("); Serial.print(x, DEC); 
+    Serial.print(", "); Serial.print(y, DEC); 
+    Serial.print(") <- "); Serial.println(c, HEX);
 
     int xi, i;
     if (y < 8) {
@@ -79,10 +70,6 @@ void setup() {
     SPI.setClockDivider(SPI_CLOCK_DIV2);
     SPI.setDataMode(SPI_MODE0);
 
-    buf = new unsigned char[BUFFER_SIZE];
-    if (buf == NULL)
-        Serial.println("OUT OF MEMORY");
-
     SPCR |= _BV(SPE); // Switch to SPI slave
     SPI.attachInterrupt(); // enables SPI slave interrupt
 
@@ -102,20 +89,32 @@ void setup() {
 
 // SPI interrupt handler
 ISR (SPI_STC_vect) {
-    // write to the current position of the ring buffer
-    buf[wpos] = SPDR;
+    // write to the pixel buffer
+    byte b = SPDR;
+    if (b == SYNC_BYTE) {
+        pxpos = 0;
+        x = 0;
+        y++;
+    }
+    else if (b == VSYNC_BYTE) {
+        pxpos = 0;
+        x = 0;
+        y = 0;
 
-    //Serial.println(buf[wpos], HEX);
+        matrix_ready = true;
+    }
+    else if (b == END_BYTE) {
+        // ignore
+    }
+    else {
+        pixel[pxpos++] = b;
 
-    // when we receive the end byte signal, mark the buffer readable
-    rend = wpos;
-
-    // reset the write head to beginning of buffer on wraparound
-    if (++wpos >= BUFFER_SIZE)
-        wpos = 0;
-
-    if (++wpos > rstart)
-        Serial.println("OVERFLOW");
+        if (pxpos >= 3) {
+            uint32_t c = matrix.Color(pixel[0], pixel[1], pixel[2]);
+            drawPixel(x++, y, c);
+            pxpos = 0;
+        }
+    }
 }
 
 // simple chase function for testing
@@ -127,8 +126,6 @@ static void chase(uint32_t c) {
         drawPixel(lx, ly, 0);
 
     drawPixel(cx, cy, c);
-    Serial.print("("); Serial.print(cx, DEC); 
-    Serial.print(", "); Serial.print(cy, DEC); Serial.println(")");
     lx = cx++;
     ly = cy;
     drawPixel(lx, ly, 0);
@@ -161,6 +158,7 @@ static void chase(uint32_t c) {
 // like having their writes interrupted.
 ISR (TIMER0_COMPA_vect) { 
     if (matrix_ready) {
+        Serial.println("DRAW");
         matrix.show();
         matrix_ready = false;
     }
@@ -168,63 +166,8 @@ ISR (TIMER0_COMPA_vect) {
 
 void loop() {
     //Serial.println("LOOP");
-    chase(Adafruit_NeoPixel::Color(128, 128, 128));
+    //chase(Adafruit_NeoPixel::Color(128, 128, 128));
     //Serial.println("CHASE");
     //testPattern();
-    //delay(2);
-
-    // reset the read head to beginning of buffer on wraparound
-    if (rstart >= BUFFER_SIZE) 
-        rstart = 0;
-
-    // effective read end handles wraparound in the ring buffer
-    short erend = rend;
-    if (erend < rstart)
-        erend = BUFFER_SIZE;
-
-    // read the data ready in the ring buffer
-    while (rstart < erend) {
-        // read the next ready byte
-        unsigned char b = buf[rstart++];
-
-        // end byte triggers show
-        if (b == END_BYTE) {
-            continue;
-        }
-
-        // perform a horizontal sync
-        else if (b == SYNC_BYTE) {
-            pxpos = 0;
-            x = 0;
-            y++;
-        }
-        
-        // perform a vertical sync
-        else if (b == VSYNC_BYTE) {
-            x = 0;
-            y = 0;
-            pxpos = 0;
-
-            //matrix.show();
-            matrix_ready = true;
-            
-            if (blink_count++ % 30 == 0) {
-                blink = !blink;
-                Serial.println("BLINKY");
-                //digitalWrite(BLINK_PIN, blink);
-            }
-        }
-
-        // fill the pixel buffer
-        else {
-            pixel[(int) pxpos++] = b;
-            if (pxpos > 3) {
-                // remap 24-bit color to 16-bit 565 color and draw
-                uint32_t c = matrix.Color(pixel[0], pixel[1], pixel[2]);
-                drawPixel(x++, y, c);
-                pxpos = 0;
-            }
-        }
-    }
 }
 
