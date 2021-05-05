@@ -3,7 +3,8 @@
 #include "esp_log.h"
 #include "esp_spiffs.h"
 
-#include "Adafruit_NeoPixel.h"
+#include "FastLED.h"
+#include "ESP32TimerInterrupt.h"
 
 static const char *TAG = "DoorLight";
 
@@ -31,12 +32,18 @@ static FILE *bmp_file;
 
 #define BRIGHTNESS 10
 
-extern short key_frame_count;
+extern volatile short key_frame_count;
 extern short key_frames[];
 
 static int current_keyframe = 0;
-static bool matrix_ready = false;
-static Adafruit_NeoPixel matrix(N_LEDS, MATRIX_PIN, NEO_GRB + NEO_KHZ800);
+static CRGB matrix[N_LEDS];
+
+static volatile bool ready_to_load = true;
+static volatile bool loaded = false;
+static volatile bool ready_to_show = false;
+static ESP32Timer flip_timer(1);
+
+static unsigned long last_millis = millis();
 
 void init_filesystem() {
     log_info("SPIFFS initialization start");
@@ -76,7 +83,7 @@ void init_filesystem() {
 }
 
 // Map pixels into the matrix grid
-void draw_pixel(uint8_t x, uint8_t y, uint32_t c) {
+void draw_pixel(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b) {
     log_verbose("(%2d, %2d) <- %06X", x, y, c);
 
     if (y >= 16 || x >= 32) return;
@@ -96,10 +103,12 @@ void draw_pixel(uint8_t x, uint8_t y, uint32_t c) {
         i = xi + (MATRIX_HEIGHT - (y % MATRIX_HEIGHT) - 1);
     }
 
-    matrix.setPixelColor(i, c);
+    matrix[i].setRGB(r, g, b);
 }
 
-void show_next_frame(short kf_cur) {
+void load_next_frame(short kf_cur) {
+    ready_to_load = false;
+
     log_debug("key_frame %d loading", kf_cur);
 
     uint8_t pix[DOORLIGHT_LINE_SIZE];
@@ -117,34 +126,64 @@ void show_next_frame(short kf_cur) {
         }
 
         for (int x = 0; x < DOORLIGHT_LINE_SIZE; x += 3) {
-            uint32_t c = matrix.Color(pix[x], pix[x+1], pix[x+2]);
-            draw_pixel(x/3, y, c);
+            draw_pixel(x/3, y, pix[x], pix[x+1], pix[x+2]);
         }
     }
 
-    log_debug("key_frame %d loaded", kf_cur);
+    loaded = true;
 
-    matrix.show();
+    log_debug("key_frame %d loaded", kf_cur);
+}
+
+void show_next_frame() {
+    loaded = false;
+    ready_to_show = false;
+
+    unsigned long this_millis = millis();
+    log_info("FPS %d", 1000/(this_millis - last_millis));
+    last_millis = this_millis;
+
+    log_debug("key_frame show");
+
+    FastLED.show();
+
+    log_debug("key_frame shown");
+
+    current_keyframe++;
+    if (current_keyframe >= key_frame_count)
+        current_keyframe = 0;
+
+    ready_to_load = true;
+}    
+
+void IRAM_ATTR flip_timer_handler() {
+    if (loaded) 
+        ready_to_show = true;
 }
 
 void setup() {
-    matrix.begin();
-    matrix.setBrightness(BRIGHTNESS);
+    FastLED.addLeds<NEOPIXEL, MATRIX_PIN>(matrix, N_LEDS);
+    FastLED.setMaxPowerInVoltsAndMilliamps(5, 5000);
+    //FastLED.setBrightness(BRIGHTNESS);
 
     Serial.begin(115200);
 
     esp_log_level_set(TAG, ESP_LOG_INFO);
 
+    if (flip_timer.attachInterruptInterval(300, flip_timer_handler)) {
+        log_error("Flip timer setup failed.");
+    }
+    else {
+        log_info("Flip timer setup complete.");
+    }
+
     init_filesystem();
 }
 
-void loop() {
-    log_debug("hello");
+void loop() { 
+    if (ready_to_load)
+        load_next_frame(current_keyframe);
 
-    show_next_frame(current_keyframe);
-    current_keyframe++;
-    if (current_keyframe >= key_frame_count)
-        current_keyframe = 0;
-
-    vTaskDelay(30);
+    if (ready_to_show)
+        show_next_frame();
 }
