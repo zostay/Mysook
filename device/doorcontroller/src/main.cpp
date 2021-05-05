@@ -43,7 +43,7 @@ static volatile bool loaded = false;
 static volatile bool ready_to_show = false;
 static ESP32Timer flip_timer(1);
 
-static unsigned long last_millis = millis();
+static unsigned long fps_last_millis = millis();
 
 void init_filesystem() {
     log_info("SPIFFS initialization start");
@@ -110,6 +110,8 @@ void load_next_frame(short kf_cur) {
     ready_to_load = false;
 
     log_debug("key_frame %d loading", kf_cur);
+    unsigned long frame_time = millis();
+    unsigned long total_seek_time = 0, total_read_time = 0, total_draw_time = 0;
 
     uint8_t pix[DOORLIGHT_LINE_SIZE];
     for (int y = 0; y < DOORLIGHT_HEIGHT; y++) {
@@ -118,21 +120,27 @@ void load_next_frame(short kf_cur) {
 
         int start = (ky*BMP_WIDTH+kx)*DOORLIGHT_BPP;
         log_debug("seek %d", start);
-        fseek(bmp_file, start, SEEK_SET);
+        unsigned long seek_time = micros();
+        lseek(fileno(bmp_file), start, SEEK_SET);
+        total_seek_time += micros() - seek_time;
 
-        size_t s = fread(pix, DOORLIGHT_BPP, DOORLIGHT_WIDTH, bmp_file);
-        if (s < DOORLIGHT_WIDTH) {
-            log_error("failed to read doorlight line, expected %d pixels, but got %d pixels", DOORLIGHT_WIDTH, s);
+        unsigned long read_time = micros();
+        size_t s = read(fileno(bmp_file), pix, DOORLIGHT_LINE_SIZE);
+        total_read_time += micros() - read_time;
+        if (s < DOORLIGHT_LINE_SIZE) {
+            log_error("failed to read doorlight line, expected %d bytes, but got %d bytes", DOORLIGHT_LINE_SIZE, s);
         }
 
+        unsigned long draw_time = micros();
         for (int x = 0; x < DOORLIGHT_LINE_SIZE; x += 3) {
             draw_pixel(x/3, y, pix[x], pix[x+1], pix[x+2]);
         }
+        total_draw_time += micros() - draw_time;
     }
 
     loaded = true;
 
-    log_debug("key_frame %d loaded", kf_cur);
+    log_info("key_frame %d loaded in %d ms, seeking %d μs, reading %d μs, drawing %d μs", kf_cur, millis()-frame_time, total_seek_time, total_read_time, total_draw_time);
 }
 
 void show_next_frame() {
@@ -140,8 +148,8 @@ void show_next_frame() {
     ready_to_show = false;
 
     unsigned long this_millis = millis();
-    log_info("FPS %d", 1000/(this_millis - last_millis));
-    last_millis = this_millis;
+    log_debug("FPS %d", 1000/(this_millis - fps_last_millis));
+    fps_last_millis = this_millis;
 
     log_debug("key_frame show");
 
