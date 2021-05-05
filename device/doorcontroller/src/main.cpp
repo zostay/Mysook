@@ -7,8 +7,10 @@
 
 static const char *TAG = "DoorLight";
 
-#define log_info(fmt, ...) ESP_LOGI(TAG, fmt, ##__VA_ARGS__)
-#define log_error(fmt, ...) ESP_LOGE(TAG, fmt, ##__VA_ARGS__)
+#define log_verbose(fmt, ...) ESP_LOGV(TAG, fmt, ##__VA_ARGS__)
+#define log_debug(fmt, ...)   ESP_LOGD(TAG, fmt, ##__VA_ARGS__)
+#define log_info(fmt, ...)    ESP_LOGI(TAG, fmt, ##__VA_ARGS__)
+#define log_error(fmt, ...)   ESP_LOGE(TAG, fmt, ##__VA_ARGS__)
 
 static FILE *bmp_file;
 
@@ -20,14 +22,14 @@ static FILE *bmp_file;
 #define DOORLIGHT_BPP       3
 #define DOORLIGHT_LINE_SIZE (DOORLIGHT_WIDTH * DOORLIGHT_BPP)
 
-#define BMP_WIDTH     360
+#define BMP_WIDTH     320
 #define BMP_LINE_SIZE (BMP_WIDTH*DOORLIGHT_BPP)
-#define BMP_HEIGHT    360
+#define BMP_HEIGHT    320
 
 #define MATRIX_PIN 23
 #define N_LEDS (DOORLIGHT_WIDTH*DOORLIGHT_HEIGHT)
 
-#define BRIGHTNESS 1
+#define BRIGHTNESS 10
 
 extern short key_frame_count;
 extern short key_frames[];
@@ -62,7 +64,7 @@ void init_filesystem() {
     log_info("SPIFFS initialization complete");
     log_info("Open test-image.data start");
 
-    bmp_file = fopen("/spiffs/test-image.data", "r");
+    bmp_file = fopen("/spiffs/latte.data", "r");
     if (bmp_file == NULL) {
         log_error("Failed to open test-image.data file.");
         return;
@@ -75,9 +77,7 @@ void init_filesystem() {
 
 // Map pixels into the matrix grid
 void draw_pixel(uint8_t x, uint8_t y, uint32_t c) {
-    Serial.print("("); Serial.print(x, DEC); 
-    Serial.print(", "); Serial.print(y, DEC); 
-    Serial.print(") <- "); Serial.println(c, HEX);
+    log_verbose("(%2d, %2d) <- %06X", x, y, c);
 
     if (y >= 16 || x >= 32) return;
 
@@ -100,23 +100,29 @@ void draw_pixel(uint8_t x, uint8_t y, uint32_t c) {
 }
 
 void show_next_frame(short kf_cur) {
-    //ESP_LOGI(TAG, "key_frame %d loading", kf_cur);
+    log_debug("key_frame %d loading", kf_cur);
 
     uint8_t pix[DOORLIGHT_LINE_SIZE];
     for (int y = 0; y < DOORLIGHT_HEIGHT; y++) {
         short kx = key_frames[kf_cur*2];
-        short ky = key_frames[kf_cur*2+1];
+        short ky = key_frames[kf_cur*2+1]+y;
 
-        fseek(bmp_file, (ky*BMP_WIDTH+kx)*DOORLIGHT_BPP, SEEK_SET);
+        int start = (ky*BMP_WIDTH+kx)*DOORLIGHT_BPP;
+        log_debug("seek %d", start);
+        fseek(bmp_file, start, SEEK_SET);
+
         size_t s = fread(pix, DOORLIGHT_BPP, DOORLIGHT_WIDTH, bmp_file);
+        if (s < DOORLIGHT_WIDTH) {
+            log_error("failed to read doorlight line, expected %d pixels, but got %d pixels", DOORLIGHT_WIDTH, s);
+        }
 
         for (int x = 0; x < DOORLIGHT_LINE_SIZE; x += 3) {
             uint32_t c = matrix.Color(pix[x], pix[x+1], pix[x+2]);
-            draw_pixel(x, y, c);
+            draw_pixel(x/3, y, c);
         }
     }
 
-    //ESP_LOGI(TAG, "key_frame %d loaded", kf_cur);
+    log_debug("key_frame %d loaded", kf_cur);
 
     matrix.show();
 }
@@ -125,10 +131,16 @@ void setup() {
     matrix.begin();
     matrix.setBrightness(BRIGHTNESS);
 
+    Serial.begin(115200);
+
+    esp_log_level_set(TAG, ESP_LOG_INFO);
+
     init_filesystem();
 }
 
 void loop() {
+    log_debug("hello");
+
     show_next_frame(current_keyframe);
     current_keyframe++;
     if (current_keyframe >= key_frame_count)
