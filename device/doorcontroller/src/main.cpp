@@ -1,7 +1,13 @@
 #include <Arduino.h>
 
 #include "esp_log.h"
-#include "esp_spiffs.h"
+
+#ifdef USE_LittleFS
+  #define SPIFFS LITTLEFS
+  #include <LITTLEFS.h>
+#else
+  #include <SPIFFS.h>
+#endif
 
 #include "FastLED.h"
 #include "ESP32TimerInterrupt.h"
@@ -13,7 +19,8 @@ static const char *TAG = "DoorLight";
 #define log_info(fmt, ...)    ESP_LOGI(TAG, fmt, ##__VA_ARGS__)
 #define log_error(fmt, ...)   ESP_LOGE(TAG, fmt, ##__VA_ARGS__)
 
-static FILE *bmp_file;
+//static FILE *bmp_file;
+static File bmp_file;
 
 #define MATRIX_WIDTH  32
 #define MATRIX_HEIGHT 8
@@ -30,7 +37,9 @@ static FILE *bmp_file;
 #define MATRIX_PIN 23
 #define N_LEDS (DOORLIGHT_WIDTH*DOORLIGHT_HEIGHT)
 
-#define BRIGHTNESS 10
+#define MATRIX_VOLTS    5
+#define MAX_MATRIX_AMPS 2000
+#define BRIGHTNESS      10
 
 extern volatile short key_frame_count;
 extern short key_frames[];
@@ -48,43 +57,51 @@ static unsigned long fps_last_millis = millis();
 void init_filesystem() {
     log_info("SPIFFS initialization start");
 
-    esp_vfs_spiffs_conf_t spiffs_config = {
-        base_path       : "/spiffs",
-        partition_label : NULL,
-        max_files       : 12,
-    };
+    if (!SPIFFS.begin()) {
+        log_error("Failed to start SPIFFS.");
+    }
+    //esp_vfs_spiffs_conf_t spiffs_config = {
+    //    base_path       : "/spiffs",
+    //    partition_label : NULL,
+    //    max_files       : 12,
+    //};
     
     // register file system
-    esp_err_t ret = esp_vfs_spiffs_register(&spiffs_config);
+    //esp_err_t ret = esp_vfs_spiffs_register(&spiffs_config);
 
-    if (ret != ESP_OK) {
-        if (ret == ESP_FAIL) {
-            log_error("Failed to mount or format filesystem");
-        } else if (ret == ESP_ERR_NOT_FOUND) {
-            log_error("Failed to find SPIFFS partition");
-        } else {
-            log_error("Failed to initialize SPIFFS (%s)", esp_err_to_name(ret));
-        }
-        return;
-    }
+    //if (ret != ESP_OK) {
+    //    if (ret == ESP_FAIL) {
+    //        log_error("Failed to mount or format filesystem");
+    //    } else if (ret == ESP_ERR_NOT_FOUND) {
+    //        log_error("Failed to find SPIFFS partition");
+    //    } else {
+    //        log_error("Failed to initialize SPIFFS (%s)", esp_err_to_name(ret));
+    //    }
+    //    return;
+    //}
 
     log_info("SPIFFS initialization complete");
-    log_info("Open test-image.data start");
+    log_info("Open bitmap file start");
 
-    bmp_file = fopen("/spiffs/latte.data", "r");
-    if (bmp_file == NULL) {
-        log_error("Failed to open test-image.data file.");
+    bmp_file = SPIFFS.open("/latte.data", "r");
+    if (!bmp_file) {
+        log_error("Failed to open bitmap file.");
         return;
     }
+    //bmp_file = fopen("/spiffs/latte.data", "r");
+    //if (bmp_file == NULL) {
+    //    log_error("Failed to open test-image.data file.");
+    //    return;
+    //}
 
-    log_info("Open test-image.data complete");
+    log_info("Open bitmap file complete, size is %d bytes", bmp_file.size());
 
     log_info("SPIFFS initialization complete");
 }
 
 // Map pixels into the matrix grid
 void draw_pixel(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b) {
-    log_verbose("(%2d, %2d) <- %06X", x, y, c);
+    log_verbose("(%2d, %2d) <- %02X%02X%02X", x, y, r, g, b);
 
     if (y >= 16 || x >= 32) return;
 
@@ -109,6 +126,19 @@ void draw_pixel(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b) {
 void load_next_frame(short kf_cur) {
     ready_to_load = false;
 
+    // Blink on error
+    if (!bmp_file) {
+        log_error("No file to read frame from.");
+        uint8_t r = kf_cur % 30 < 20 ? 0x99 : 0x00;
+        for (int y = 0; y < 3; y++) {
+            for (int x = 0; x < 3; x++) {
+                draw_pixel(x, y, r, 0, 0);
+            }
+        }
+        loaded = true;
+        return;
+    }
+
     log_debug("key_frame %d loading", kf_cur);
     unsigned long frame_time = millis();
     unsigned long total_seek_time = 0, total_read_time = 0, total_draw_time = 0;
@@ -121,11 +151,13 @@ void load_next_frame(short kf_cur) {
         int start = (ky*BMP_WIDTH+kx)*DOORLIGHT_BPP;
         log_debug("seek %d", start);
         unsigned long seek_time = micros();
-        lseek(fileno(bmp_file), start, SEEK_SET);
+        bmp_file.seek(start, SeekSet);
+        //lseek(fileno(bmp_file), start, SEEK_SET);
         total_seek_time += micros() - seek_time;
 
         unsigned long read_time = micros();
-        size_t s = read(fileno(bmp_file), pix, DOORLIGHT_LINE_SIZE);
+        size_t s = bmp_file.read(pix, DOORLIGHT_LINE_SIZE);
+        //size_t s = read(fileno(bmp_file), pix, DOORLIGHT_LINE_SIZE);
         total_read_time += micros() - read_time;
         if (s < DOORLIGHT_LINE_SIZE) {
             log_error("failed to read doorlight line, expected %d bytes, but got %d bytes", DOORLIGHT_LINE_SIZE, s);
@@ -171,7 +203,7 @@ void IRAM_ATTR flip_timer_handler() {
 
 void setup() {
     FastLED.addLeds<NEOPIXEL, MATRIX_PIN>(matrix, N_LEDS);
-    FastLED.setMaxPowerInVoltsAndMilliamps(5, 5000);
+    FastLED.setMaxPowerInVoltsAndMilliamps(MATRIX_VOLTS, MAX_MATRIX_AMPS);
     //FastLED.setBrightness(BRIGHTNESS);
 
     Serial.begin(115200);
