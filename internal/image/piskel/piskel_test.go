@@ -1,6 +1,7 @@
 package piskel
 
 import (
+	"image"
 	"strings"
 	"testing"
 
@@ -13,8 +14,10 @@ const testPiskel = `{"modelVersion":2,"piskel":{"name":"policelights","descripti
 func TestDecoder(t *testing.T) {
 	pr := strings.NewReader(testPiskel)
 
-	pimg, err := Decode(pr)
+	ppsk, err := Decode(pr)
 	require.NoError(t, err)
+
+	var pimg image.Image = ppsk
 
 	r, g, b, a := pimg.At(0, 0).RGBA()
 	assert.Equal(t, uint32(0xffff), r, "red is on")
@@ -24,7 +27,6 @@ func TestDecoder(t *testing.T) {
 
 	require.IsType(t, &Piskel{}, pimg, "image is actually a Piskel")
 
-	ppsk, _ := pimg.(*Piskel)
 	pmod := ppsk.Piskel
 
 	assert.Equal(t, "policelights", pmod.Name, "name is policelights")

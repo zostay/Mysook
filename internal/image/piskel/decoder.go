@@ -2,11 +2,10 @@ package piskel
 
 import (
 	"encoding/json"
-	"image"
 	"io"
 )
 
-func Decode(r io.Reader) (image.Image, error) {
+func Decode(r io.Reader) (*Piskel, error) {
 	d := json.NewDecoder(r)
 
 	var pImage Piskel
