@@ -3,8 +3,15 @@
 #include "esp_log.h"
 
 #ifdef USE_LittleFS
+  // merged into esp32 core since 1.0.6
+  // #include <LITTLEFS.h>
+  #include <LittleFS.h>
+
+  // FS *filesystem = &LITTLEFS;
+  #define LITTLEFS LittleFS
   #define SPIFFS LITTLEFS
-  #include <LITTLEFS.h>
+  #define FileFS LITTLEFS
+  #define FS_NAME "LittleFS"
 #else
   #include <SPIFFS.h>
 #endif
