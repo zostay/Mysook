@@ -12,20 +12,18 @@
 //	| Keyframe Count         | 2 bytes (uint16)    |
 //	| Image Count            | 2 bytes (uint16)    |
 //	+------------------------+---------------------+
-//	| Key Frames             | 8 bytes per frame   |
+//	| Key Frames             | 12 bytes per frame  |
 //	| - Image Index          | 2 bytes (uint16)    |
-//	| - X, Y Origin          | 4 bytes (2x uint16) |
+//	| - X, Y Origin          | 8 bytes (2x int32)  |
 //	| - Milliseconds         | 2 bytes (uint16)    |
 //	+------------------------+---------------------+
-//	| Image Index            | 8 bytes per image   |
-//	| - Seek Position        | 8 bytes (int64)     |
+//	| Image Index            | 20 bytes per image  |
+//	| - OriginX, OriginY     | 8 bytes (2x int32)  |
+//	| - ExtentX, ExtentY     | 8 bytes (2x int32)  |
+//	| - Seek Position        | 4 bytes (int32)     |
 //	+------------------------+---------------------+
 //	| Images                 | N bytes per image   |
-//	| - OriginX              | 8 bytes (int64)     |
-//	| - OriginY              | 8 bytes (int64)     |
-//	| - ExtentX              | 8 bytes (int64)     |
-//	| - ExtentY              | 8 bytes (int64)     |
-//	| - []PixelData          | Arbitrary Length    |
+//	| - []PixelData          | 3-bytes per pixel   |
 //	+------------------------+---------------------+
 //
 // In Version 0 of the format, the interpretation of the file is as follows.
@@ -44,4 +42,15 @@
 // held for approximately the given milliseconds encoded on the frame.
 //
 // Bytes are always ordered little endian.
+//
+// The image data is encoded in two parts. The first parts contains the image
+// index, which describes the bounds of the image and the seek position that
+// points to the position in the file where the pixel data starts. The second
+// section is frames of pixel data. The pixel data is stored in byte triplets,
+// three bytes per pixel. Calculating the position in the pixel data for a given
+// (x, y) is performed by calculating ((y-OriginY)*stride+(x-OriginX))*3 where
+// stride is equal to ExtentX-OriginX.
+//
+// The pixel triples are stored in RGB order. Each unsigned byte representing the
+// intensity of each color, from 0 to 255.
 package manic

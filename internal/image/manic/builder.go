@@ -2,6 +2,7 @@ package manic
 
 import (
 	"image"
+	"image/color"
 	"os"
 )
 
@@ -14,6 +15,20 @@ type Builder struct {
 // and height.
 func NewBuilder(w, h uint16) *Builder {
 	return &Builder{New(w, h)}
+}
+
+// pixelData extracts the pixel data from an image.Image.
+func pixelData(img image.Image) []byte {
+	bounds := img.Bounds()
+	w, h := bounds.Dx(), bounds.Dy()
+	data := make([]byte, 0, w*h*3)
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			c := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
+			data = append(data, []byte{c.R, c.G, c.B}...)
+		}
+	}
+	return data
 }
 
 // AddImageFile adds image file from the OS to the animation.
@@ -32,21 +47,25 @@ func (b *Builder) AddImageFile(file string) (uint16, error) {
 		return 0, err
 	}
 
-	b.anim.Images = append(b.anim.Images, img)
+	mImg := NewImage(img.Bounds(), pixelData(img))
+
+	b.anim.Images = append(b.anim.Images, *mImg)
 	return uint16(len(b.anim.Images) - 1), nil
 }
 
 // AddKeyframe adds a single keyframe to the animation.
 func (b *Builder) AddKeyframe(
 	idx uint16,
-	x, y uint16,
+	x, y int32,
 	millis uint16,
 ) uint16 {
 	b.anim.Keyframes = append(b.anim.Keyframes, Keyframe{
 		ImgIndex: idx,
-		OriginX:  x,
-		OriginY:  y,
-		Millis:   millis,
+		Origin: Point{
+			X: x,
+			Y: y,
+		},
+		Millis: millis,
 	})
 
 	return uint16(len(b.anim.Keyframes) - 1)
@@ -88,7 +107,7 @@ func (b *Builder) AddScanlineKeyframes(
 	)
 	for range count {
 		fm := uint16(dMillis * ease(f))
-		b.AddKeyframe(idx, uint16(x), uint16(y), fm)
+		b.AddKeyframe(idx, int32(x), int32(y), fm)
 		x += dx
 		y += dy
 		f += 1 / float64(count)
