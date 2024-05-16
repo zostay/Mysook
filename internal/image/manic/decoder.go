@@ -67,17 +67,11 @@ func (d *Decoder) decodeImage(image *Image) (err error) {
 func (d *Decoder) Decode(anim *Animation) (err error) {
 	// Read Magic Number
 	var magicNumber [5]byte
-	if err = binary.Read(d.r, byteOrder, &magicNumber); err != nil {
-		return
-	}
-
-	// Verify the magic number
-	if bytes.Compare(magicNumber[:], theMagicNumber[:]) != 0 {
+	if !bytes.Equal(magicNumber[:], theMagicNumber[:]) {
 		return fmt.Errorf("incorrect magic number, expected MANIC, go %s", string(magicNumber[:]))
 	}
 
 	// Read the version
-	anim = &Animation{}
 	if err = binary.Read(d.r, byteOrder, &anim.Version); err != nil {
 		return
 	}
@@ -159,6 +153,7 @@ func (d *Decoder) Decode(anim *Animation) (err error) {
 	return
 }
 
+// Decode loads an animation from the given io.Reader.
 func Decode(r io.Reader) (*Animation, error) {
 	d := NewDecoder(r)
 	anim := &Animation{}

@@ -14,7 +14,7 @@ type Image struct {
 
 var _ image.Image = (*Image)(nil)
 
-// At returns the color of the given pixel
+// At returns the color of the given pixel.
 func (i *Image) At(x, y int) color.Color {
 	idx := (int32(y)-i.Rect.Min.Y)*i.stride + (int32(x) - i.Rect.Min.X)
 	r := i.PixelData[idx]

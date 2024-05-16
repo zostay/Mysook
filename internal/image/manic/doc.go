@@ -37,7 +37,7 @@
 // compression. Each key frame is the full frame size and is expected to
 // overwrite the entire canvas of Frame Width/Height size each time. The key
 // frame selects its pixels from a clipped window taken from one of the images.
-// The image is selected by teh Image Index and the window is bounded by the key
+// The image is selected by the Image Index and the window is bounded by the key
 // frame's (x, y) origin with the frame (width x height). The frame should be
 // held for approximately the given milliseconds encoded on the frame.
 //

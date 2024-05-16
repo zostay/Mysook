@@ -122,3 +122,8 @@ func (e *Encoder) Encode(anim *Animation) (err error) {
 
 	return nil
 }
+
+// Encode writes the given animation to the specified io.Writer.
+func Encode(w io.Writer, anim *Animation) error {
+	return NewEncoder(w).Encode(anim)
+}

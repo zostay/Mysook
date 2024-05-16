@@ -4,7 +4,7 @@ package manic
 const Version0 = '0'
 
 // Rect is a rectangle in 2D space. The Min point is the inclusive origin of the
-// rectangel and the Max point is the exclusive end of the rectangle.
+// rectangle and the Max point is the exclusive end of the rectangle.
 type Rect struct {
 	Min, Max Point
 }
@@ -14,7 +14,7 @@ type Point struct {
 	X, Y int32
 }
 
-// Animation is the internal representation of a manic animation.
+// Animation represents a manic animation.
 type Animation struct {
 	Version        byte
 	FrameW, FrameH uint16
@@ -22,7 +22,7 @@ type Animation struct {
 	Images         []Image
 }
 
-// Keyframe represents a single frame to use to fill the entire display
+// Keyframe represents a single frame to use to fill the entire display.
 type Keyframe struct {
 	ImgIndex uint16
 	Origin   Point
