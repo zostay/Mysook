@@ -1,6 +1,10 @@
 #ifndef __SIM_ADAFRUIT_GFX_H
 #define __SIM_ADAFRUIT_GFX_H
 
+#if defined(ARDUINO) || defined(ESP_PLATFORM)
+#error Do not include Sim_Adafruit_GFX.h in a microcontroller target.
+#endif
+
 #include <Simduino.h>
 #include "Sim_gfxfont.h"
 

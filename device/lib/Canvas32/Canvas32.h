@@ -1,7 +1,7 @@
 #ifndef __CANVAS32_H
 #define __CANVAS32_H
 
-#ifdef ARDUINO
+#if defined(ARDUINO) || defined(ESP_PLATFORM)
 #include <Adafruit_GFX.h>
 #else
 #include <Sim_Adafruit_GFX.h>

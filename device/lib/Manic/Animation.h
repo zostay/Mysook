@@ -7,12 +7,14 @@
 #include <iostream>
 #include <fstream>
 
+#include <Panel.h>
+
 namespace mysook {
 
 /**
  * The Point class represents a 2D point with integer coordinates.
 */
-struct Point {
+struct AnimationPoint {
     std::int32_t x;
     std::int32_t y;
 };
@@ -20,42 +22,42 @@ struct Point {
 /**
  * The Rect class represents a rectangle with integer coordinates.
 */
-struct Rect {
-    Point min;
-    Point max;
+struct AnimationRect {
+    AnimationPoint min;
+    AnimationPoint max;
 };
 
 /**
  * The Keyframe class represents a keyframe in an animation.
 */
-class Keyframe {
+class AnimationKeyframe {
     std::uint16_t img_index;
     std::uint16_t origin_x, origin_y;
     std::uint16_t millis;
 
 public:
-    Keyframe(std::istream &in);
+    AnimationKeyframe(std::istream &in);
 };
 
-class Image {
-    Rect bounds;
+class AnimationImage {
+    AnimationRect bounds;
     std::uint32_t pixel_origin;
     std::uint32_t stride;
 
 public:
-    Image(Rect &bounds);
+    AnimationImage(AnimationRect &bounds);
 
     /**
      * This constuctor reads an Image from an input stream, reading the bounds.
     */
-   Image(std::istream &in);
+   AnimationImage(std::istream &in);
 };
 
 class Animation {
     char version;
     std::uint16_t frame_w, frame_h;
-    std::vector<std::unique_ptr<Keyframe>> keyframes;
-    std::vector<std::unique_ptr<Image>> images;
+    std::vector<std::unique_ptr<AnimationKeyframe>> keyframes;
+    std::vector<std::unique_ptr<AnimationImage>> images;
 
 public:
     /**
@@ -69,6 +71,14 @@ public:
      * render individual frames.
      */
     Animation(std::istream &in);
+
+    /**
+     * Render a frame of the animation to the panel. You specify the panel to
+     * write to and the frame number to render. This function returns the next
+     * frame number in the sequence.
+     */
+    template<int W, int H> 
+    std::uint16_t render(mysook::RGBPanel<W, H> *panel, std::uint16_t frame_num);
 };
 
 

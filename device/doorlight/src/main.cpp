@@ -1,3 +1,4 @@
+#ifdef ARDUINO
 #include <Arduino.h>
 
 #include "esp_log.h"
@@ -17,7 +18,11 @@
 #endif
 
 #include "FastLED.h"
+#include "FastLED_NeoMatrix.h"
 #include "ESP32TimerInterrupt.h"
+
+#include <MC_Panel.h>
+#endif//ARDUINO
 
 static const char *TAG = "DoorLight";
 
@@ -52,7 +57,7 @@ extern volatile short key_frame_count;
 extern short key_frames[];
 
 static int current_keyframe = 0;
-static CRGB matrix[N_LEDS];
+static CRGB strip[N_LEDS];
 
 static volatile bool ready_to_load = true;
 static volatile bool loaded = false;
@@ -60,6 +65,11 @@ static volatile bool ready_to_show = false;
 static ESP32Timer flip_timer(1);
 
 static unsigned long fps_last_millis = millis();
+
+FastLED_NeoMatrix matrix(strip, MATRIX_WIDTH, MATRIX_HEIGHT, 1, 2, 
+    NEO_MATRIX_BOTTOM | NEO_MATRIX_RIGHT | NEO_MATRIX_COLUMNS 
+        | NEO_MATRIX_ZIGZAG | NEO_TILE_ZIGZAG);
+mysook::MC_RGBPanel<DOORLIGHT_WIDTH, DOORLIGHT_HEIGHT, FastLED_NeoMatrix> display(matrix);
 
 void init_filesystem() {
     log_info("SPIFFS initialization start");
@@ -109,25 +119,26 @@ void init_filesystem() {
 // Map pixels into the matrix grid
 void draw_pixel(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b) {
     log_verbose("(%2d, %2d) <- %02X%02X%02X", x, y, r, g, b);
+    display.put_pixel(x, y, mysook::Color(r, g, b));
 
-    if (y >= 16 || x >= 32) return;
+    // if (y >= 16 || x >= 32) return;
 
-    int xi, i;
-    if (y < 8) {
-        xi = 256 - (x + 1) * MATRIX_HEIGHT;
-    }
-    else {
-        xi = 256 + x * MATRIX_HEIGHT;
-    }
+    // int xi, i;
+    // if (y < 8) {
+    //     xi = 256 - (x + 1) * MATRIX_HEIGHT;
+    // }
+    // else {
+    //     xi = 256 + x * MATRIX_HEIGHT;
+    // }
 
-    if (x % 2 == 0) {
-        i = xi + (y % MATRIX_HEIGHT);
-    }
-    else {
-        i = xi + (MATRIX_HEIGHT - (y % MATRIX_HEIGHT) - 1);
-    }
+    // if (x % 2 == 0) {
+    //     i = xi + (y % MATRIX_HEIGHT);
+    // }
+    // else {
+    //     i = xi + (MATRIX_HEIGHT - (y % MATRIX_HEIGHT) - 1);
+    // }
 
-    matrix[i].setRGB(r, g, b);
+    // matrix[i].setRGB(r, g, b);
 }
 
 void load_next_frame(short kf_cur) {
@@ -203,13 +214,14 @@ void show_next_frame() {
     ready_to_load = true;
 }    
 
-void IRAM_ATTR flip_timer_handler() {
+bool IRAM_ATTR flip_timer_handler(void *timerNo) {
     if (loaded) 
         ready_to_show = true;
+    return true;
 }
 
 void setup() {
-    FastLED.addLeds<NEOPIXEL, MATRIX_PIN>(matrix, N_LEDS);
+    FastLED.addLeds<NEOPIXEL, MATRIX_PIN>(strip, N_LEDS);
     FastLED.setMaxPowerInVoltsAndMilliamps(MATRIX_VOLTS, MAX_MATRIX_AMPS);
     //FastLED.setBrightness(BRIGHTNESS);
 

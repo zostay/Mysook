@@ -1,7 +1,7 @@
 #ifndef __WEBCLIENT_H
 #define __WEBCLIENT_H
 
-#ifdef ARDUINO
+#if defined(ARDUINO) || defined(ESP_PLATFORM)
 #include <WiFiClient.h>
 #else
 #include <Simduino.h>

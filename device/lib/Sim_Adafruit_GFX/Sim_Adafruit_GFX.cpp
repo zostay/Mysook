@@ -32,6 +32,8 @@ POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "Sim_Adafruit_GFX.h"
+#include <memory.h>
+#error Why is this here?
 
 //#include "glcdfont.c"
 //#ifdef __AVR__
