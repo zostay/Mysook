@@ -6,6 +6,28 @@
 #include <stdexcept>
 #include <iostream>
 #include <fstream>
+#include <memory>
+
+#ifdef ARDUINO
+#ifdef USE_LittleFS
+  #include <LittleFS.h>
+#endif//USE_LittleFS
+#include <Stream.h>
+#endif//ARDUINO
+
+#ifdef ESP_PLATFORM
+#include "esp_log.h"
+static const char *ANIM_TAG = "Animation";
+#define log_verbose(fmt, ...) ESP_LOGV(ANIM_TAG, fmt, ##__VA_ARGS__)
+#define log_debug(fmt, ...)   ESP_LOGD(ANIM_TAG, fmt, ##__VA_ARGS__)
+#define log_info(fmt, ...)    ESP_LOGI(ANIM_TAG, fmt, ##__VA_ARGS__)
+#define log_error(fmt, ...)   ESP_LOGE(ANIM_TAG, fmt, ##__VA_ARGS__)
+#else//ESP_PLATFORM
+#define log_verbose(fmt, ...)
+#define log_debug(fmt, ...)
+#define log_info(fmt, ...)
+#define log_error(fmt, ...)
+#endif//ESP_PLATFORM
 
 #include <Panel.h>
 
@@ -32,11 +54,20 @@ struct AnimationRect {
 */
 class AnimationKeyframe {
     std::uint16_t img_index;
-    std::uint16_t origin_x, origin_y;
+    std::int32_t origin_x, origin_y;
     std::uint16_t millis;
 
 public:
     AnimationKeyframe(std::istream &in);
+
+#ifdef ARDUINO
+    AnimationKeyframe(Stream &stream);
+#endif//ARDUINO
+
+    std::uint16_t get_img_index() const { return img_index; }
+    std::uint16_t get_origin_x() const { return origin_x; }
+    std::uint16_t get_origin_y() const { return origin_y; }
+    std::uint16_t get_millis() const { return millis; }
 };
 
 class AnimationImage {
@@ -51,6 +82,14 @@ public:
      * This constuctor reads an Image from an input stream, reading the bounds.
     */
    AnimationImage(std::istream &in);
+
+#ifdef ARDUINO
+    AnimationImage(Stream &stream);
+#endif//ARDUINO
+
+    AnimationRect get_bounds() const { return bounds; }
+    std::uint32_t get_pixel_origin() const { return pixel_origin; }
+    std::uint32_t get_stride() const { return stride; }
 };
 
 class Animation {
@@ -71,6 +110,14 @@ public:
      * render individual frames.
      */
     Animation(std::istream &in);
+    
+#ifdef ARDUINO
+    /**
+     * This constructor loads an Animation from a file, using an Arduino Stream
+     * interface.
+     */
+    Animation(Stream &stream);
+#endif//ARDUINO
 
     /**
      * Render a frame of the animation to the panel. You specify the panel to
@@ -78,7 +125,107 @@ public:
      * frame number in the sequence.
      */
     template<int W, int H> 
-    std::uint16_t render(mysook::RGBPanel<W, H> *panel, std::uint16_t frame_num);
+    std::uint16_t render(mysook::RGBPanel<W, H> *panel, std::uint16_t frame_num, std::istream &in) {
+        // weird state, reset to 0
+        if (frame_num >= keyframes.size()) {
+            return 0;
+        }
+
+        // ensure we don't update outside the bounds of the panel or the frame
+        int w = frame_w > W ? W : frame_w;
+        int h = frame_h > H ? H : frame_h;
+
+        AnimationKeyframe *keyframe = keyframes[frame_num].get();
+        AnimationImage *image = images[keyframe->get_img_index()].get();
+
+        // we start each row at the same x position and read a whole row at a time
+        int img_x = keyframe->get_origin_x() - image->get_bounds().min.x;
+
+        // the maximum y position in the image for bounds checking
+        int max_y = image->get_bounds().max.y - image->get_bounds().min.y;
+        
+        std::unique_ptr<uint8_t[]> pixels(new uint8_t[w*3]);
+        for (int y = 0; y < h; y++) {
+            // calculate the y position in the image
+            int img_y = y + keyframe->get_origin_y() - image->get_bounds().min.y;
+
+            // prevent reading past the end of the image
+            if (img_y > max_y) {
+                break;
+            }
+
+            // seek to the correct position in the file to read the row
+            int seekpos = image->get_pixel_origin() + img_y * image->get_stride() + img_x * 3;
+            in.seekg(seekpos);
+
+            // read the row of pixels and update the panel
+            std::uint8_t *row = pixels.get();
+            in.read((char*) row, w*3);
+            for (int x = 0; x < w; x++) {
+                panel->put_pixel(x, y, row[x*3], row[x*3+1], row[x*3+2]);
+            }
+        }
+
+        // next frame or 0 if we reached the end of the animation
+        return (frame_num + 1) % keyframes.size();
+    }
+
+#ifdef ARDUINO
+    template<int W, int H> 
+    std::uint16_t render(mysook::RGBPanel<W, H> *panel, std::uint16_t frame_num, fs::File &stream) {
+        // weird state, reset to 0
+        if (frame_num >= keyframes.size()) {
+            return 0;
+        }
+
+        // ensure we don't update outside the bounds of the panel or the frame
+        int w = frame_w > W ? W : frame_w;
+        int h = frame_h > H ? H : frame_h;
+
+        AnimationKeyframe *keyframe = keyframes[frame_num].get();
+        AnimationImage *image = images[keyframe->get_img_index()].get();
+
+        // we start each row at the same x position and read a whole row at a time
+        int img_x = keyframe->get_origin_x() - image->get_bounds().min.x;
+
+        // the maximum y position in the image for bounds checking
+        int max_y = image->get_bounds().max.y - image->get_bounds().min.y;
+        
+        std::unique_ptr<uint8_t[]> pixels(new uint8_t[w*3]);
+        for (int y = 0; y < h; y++) {
+            // calculate the y position in the image
+            int img_y = y + keyframe->get_origin_y() - image->get_bounds().min.y;
+
+            // prevent reading past the end of the image
+            if (img_y > max_y) {
+                break;
+            }
+
+            // seek to the correct position in the file to read the row
+            int seekpos = image->get_pixel_origin() + img_y * image->get_stride() + img_x * 3;
+            stream.seek(seekpos, fs::SeekSet);
+            // log_debug("seekpos: %x", image->get_pixel_origin());
+
+            // read the row of pixels and update the panel
+            uint8_t *row = pixels.get();
+            stream.readBytes((char*) row, w*3);
+            for (int x = 0; x < w; x++) {
+                //log_debug("put_pixel(%d, %d) <- #%02x%02x%02x", x, y, row[x*3], row[x*3+1], row[x*3+2]);
+                panel->put_pixel(x, y, row[x*3], row[x*3+1], row[x*3+2]);
+            }
+        }
+
+        // next frame or 0 if we reached the end of the animation
+        return (frame_num + 1) % keyframes.size();
+    }
+#endif//ARDUINO
+
+    /**
+     * This is the amount of time the animation should hold on the given frame.
+     */
+    std::uint16_t frame_time(std::uint16_t frame_num) const {
+        return keyframes[frame_num].get()->get_millis();
+    }
 };
 
 

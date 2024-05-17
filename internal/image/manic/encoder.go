@@ -27,7 +27,6 @@ func (e *Encoder) writeIt(data any) error {
 // Encode writes the given animation to the specified io.Writer.
 func (e *Encoder) Encode(anim *Animation) (err error) {
 	// Write the magic number
-	var seekPos int
 	if err = e.writeIt(theMagicNumber); err != nil {
 		return
 	}
@@ -73,8 +72,13 @@ func (e *Encoder) Encode(anim *Animation) (err error) {
 		}
 	}
 
-	// Write out the image seek index
-	seekPos += binary.Size(int32(0)) * len(anim.Images)
+	// This is the length of the image index, so all image index seek positions must come after this.
+	indexLen := binary.Size(int32(0)) * 5 * len(anim.Images)
+
+	// This holds the current seek position now. We will offset it after each
+	// image to account for the byte length of that image.
+	seekPos := int32(e.seekPos + indexLen)
+
 	for _, img := range anim.Images {
 		// Write out the image extents
 		if err = e.writeIt(int32(img.Bounds().Min.X)); err != nil {
@@ -91,13 +95,11 @@ func (e *Encoder) Encode(anim *Animation) (err error) {
 		}
 
 		// Write out the image seek index position
-		if err = e.writeIt(int32(e.seekPos)); err != nil {
+		if err = e.writeIt(int32(seekPos)); err != nil {
 			return
 		}
-		seekPos += binary.Size(int32(0)) * 4
-		imgSize := img.Bounds().Size()
-		pixelCount := imgSize.X * imgSize.Y
-		seekPos += binary.Size(byte(0)) * 3 * pixelCount
+		pixelCount := img.stride * int32(img.Bounds().Dy())
+		seekPos += int32(binary.Size(byte(0))) * 3 * pixelCount
 	}
 
 	// Write out each image

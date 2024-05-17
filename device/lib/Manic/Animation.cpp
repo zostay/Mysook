@@ -19,41 +19,67 @@ AnimationImage::AnimationImage(std::istream &in) {
 }
 
 Animation::Animation(std::istream &in) {
+    char magic[5];
+    in.read((char*) magic, 5);
     in.read((char*) &version, 1);
     in.read((char*) &frame_w, 2);
     in.read((char*) &frame_h, 2);
 
-    int numKeyframes;
-    in.read((char*) &numKeyframes, 4);
+    std::uint16_t numKeyframes, numImages;
+    in.read((char*) &numKeyframes, 2);
+    in.read((char*) &numImages, 2);
+
     for (int i = 0; i < numKeyframes; i++) {
         std::unique_ptr<AnimationKeyframe> keyframe(new AnimationKeyframe(in));
         keyframes.push_back(std::move(keyframe));
     }
 
-    int numImages;
-    in.read((char*) &numImages, 4);
     for (int i = 0; i < numImages; i++) {
         std::unique_ptr<AnimationImage> image(new AnimationImage(in));
         images.push_back(std::move(image));
     }
 }
 
-template<int W, int H> 
-std::uint16_t Animation::render(mysook::RGBPanel<W, H> *panel, std::uint16_t frame_num) {
-    if (frame_num >= keyframes.size()) {
-        return 0;
-    }
-
-    AnimationKeyframe *keyframe = keyframes[frame_num].get();
-    AnimationImage *image = images[keyframe->img_index].get();
-
-    for (int y = image->bounds.min.y; y < image->bounds.max.y; y++) {
-        for (int x = image->bounds.min.x; x < image->bounds.max.x; x++) {
-            int pixel = image->pixel_origin + (y * image->stride) + (x * 3);
-            panel->put_pixel(x - keyframe->origin_x, y - keyframe->origin_y, 
-                             pixel[pixel], pixel[pixel + 1], pixel[pixel + 2]);
-        }
-    }
-
-    return frame_num + 1;
+#if defined(ARDUINO) || defined(ESP_PLATFORM)
+AnimationKeyframe::AnimationKeyframe(Stream &stream) {
+    stream.readBytes((char*) &img_index, 2);
+    stream.readBytes((char*) &origin_x, 4);
+    stream.readBytes((char*) &origin_y, 4);
+    stream.readBytes((char*) &millis, 2);
+    log_info("Read keyframe: %d %d %d %d", img_index, origin_x, origin_y, millis);
 }
+
+AnimationImage::AnimationImage(Stream &stream) {
+    stream.readBytes((char*) &bounds, sizeof(bounds));
+    stream.readBytes((char*) &pixel_origin, 4);
+    stride = (bounds.max.x - bounds.min.x) * 3;
+    log_info("Read image: %x %x %x %x %x %x %x", bounds.min.x, bounds.min.y, bounds.max.x, bounds.max.y, pixel_origin, stride);
+}
+
+Animation::Animation(Stream &stream) {
+    log_info("Reading Animation header");
+    char magic[5];
+    stream.readBytes((char*) magic, 5);
+    stream.readBytes((char*) &version, 1);
+    stream.readBytes((char*) &frame_w, 2);
+    stream.readBytes((char*) &frame_h, 2);
+
+    std::uint16_t numKeyframes, numImages;
+    stream.readBytes((char*) &numKeyframes, 2);
+    stream.readBytes((char*) &numImages, 2);
+
+    log_info("Reading %d keyframes", numKeyframes);
+    for (int i = 0; i < numKeyframes; i++) {
+        std::unique_ptr<AnimationKeyframe> keyframe(new AnimationKeyframe(stream));
+        log_info("Animation header read: %d %d", keyframe.get()->get_img_index(), keyframe.get()->get_millis());
+        keyframes.push_back(std::move(keyframe));
+    }
+
+    log_info("Reading %d images", numImages);
+    for (int i = 0; i < numImages; i++) {
+        std::unique_ptr<AnimationImage> image(new AnimationImage(stream));
+        images.push_back(std::move(image));
+    }
+    log_info("Animation loaded");
+}
+#endif//ARDUINO

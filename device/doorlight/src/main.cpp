@@ -21,6 +21,7 @@
 #include "FastLED_NeoMatrix.h"
 #include "ESP32TimerInterrupt.h"
 
+#include <Animation.h>
 #include <MC_Panel.h>
 #endif//ARDUINO
 
@@ -53,16 +54,20 @@ static File bmp_file;
 #define MAX_MATRIX_AMPS 2000
 #define BRIGHTNESS      10
 
-extern volatile short key_frame_count;
+extern short key_frame_count;
 extern short key_frames[];
 
+static std::int64_t tick_timer = 0;
+static long loaded_frame_remain = 0;
+static long shown_frame_remain = 0;
 static int current_keyframe = 0;
 static CRGB strip[N_LEDS];
 
-static volatile bool ready_to_load = true;
-static volatile bool loaded = false;
-static volatile bool ready_to_show = false;
-static ESP32Timer flip_timer(1);
+static std::unique_ptr<mysook::Animation> animation;
+
+static bool ready_to_load = true;
+static bool loaded = false;
+static bool ready_to_show = false;
 
 static unsigned long fps_last_millis = millis();
 
@@ -98,9 +103,12 @@ void init_filesystem() {
     //}
 
     log_info("SPIFFS initialization complete");
+}
+
+void load_animation() {
     log_info("Open bitmap file start");
 
-    bmp_file = SPIFFS.open("/latte.data", "r");
+    bmp_file = SPIFFS.open("/congrats-logan.manic", "r");
     if (!bmp_file) {
         log_error("Failed to open bitmap file.");
         return;
@@ -111,91 +119,85 @@ void init_filesystem() {
     //    return;
     //}
 
+    log_info("Parsing bitmap file.");
+
+    animation.reset(new mysook::Animation(bmp_file));
+
     log_info("Open bitmap file complete, size is %d bytes", bmp_file.size());
 
     log_info("SPIFFS initialization complete");
 }
 
 // Map pixels into the matrix grid
-void draw_pixel(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b) {
-    log_verbose("(%2d, %2d) <- %02X%02X%02X", x, y, r, g, b);
-    display.put_pixel(x, y, mysook::Color(r, g, b));
+// void draw_pixel(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b) {
+//     log_verbose("(%2d, %2d) <- %02X%02X%02X", x, y, r, g, b);
+//     display.put_pixel(x, y, mysook::Color(r, g, b));
+// }
 
-    // if (y >= 16 || x >= 32) return;
-
-    // int xi, i;
-    // if (y < 8) {
-    //     xi = 256 - (x + 1) * MATRIX_HEIGHT;
-    // }
-    // else {
-    //     xi = 256 + x * MATRIX_HEIGHT;
-    // }
-
-    // if (x % 2 == 0) {
-    //     i = xi + (y % MATRIX_HEIGHT);
-    // }
-    // else {
-    //     i = xi + (MATRIX_HEIGHT - (y % MATRIX_HEIGHT) - 1);
-    // }
-
-    // matrix[i].setRGB(r, g, b);
+static std::uint8_t blink = 0;
+void load_next_frame() {
+    log_debug("Loading frame %d", current_keyframe);
+    loaded_frame_remain = animation.get()->frame_time(current_keyframe);
+    current_keyframe = animation.get()->render(&display, current_keyframe, bmp_file);
+    display.put_pixel(0, 0, mysook::Color(blink, 0, 0));
+    blink = blink == 0 ? 255 : 0;
+    log_debug("Frame is loaded.");
 }
 
-void load_next_frame(short kf_cur) {
-    ready_to_load = false;
+// void load_next_frame(short kf_cur) {
+//     ready_to_load = false;
 
-    // Blink on error
-    if (!bmp_file) {
-        log_error("No file to read frame from.");
-        uint8_t r = kf_cur % 30 < 20 ? 0x99 : 0x00;
-        for (int y = 0; y < 3; y++) {
-            for (int x = 0; x < 3; x++) {
-                draw_pixel(x, y, r, 0, 0);
-            }
-        }
-        loaded = true;
-        return;
-    }
+//     // Blink on error
+//     if (!bmp_file) {
+//         log_error("No file to read frame from.");
+//         uint8_t r = kf_cur % 30 < 20 ? 0x99 : 0x00;
+//         for (int y = 0; y < 3; y++) {
+//             for (int x = 0; x < 3; x++) {
+//                 draw_pixel(x, y, r, 0, 0);
+//             }
+//         }
+//         loaded = true;
+//         return;
+//     }
 
-    log_debug("key_frame %d loading", kf_cur);
-    unsigned long frame_time = millis();
-    unsigned long total_seek_time = 0, total_read_time = 0, total_draw_time = 0;
+//     log_debug("key_frame %d loading", kf_cur);
+//     unsigned long frame_time = millis();
+//     unsigned long total_seek_time = 0, total_read_time = 0, total_draw_time = 0;
 
-    uint8_t pix[DOORLIGHT_LINE_SIZE];
-    for (int y = 0; y < DOORLIGHT_HEIGHT; y++) {
-        short kx = key_frames[kf_cur*2];
-        short ky = key_frames[kf_cur*2+1]+y;
+//     uint8_t pix[DOORLIGHT_LINE_SIZE];
+//     for (int y = 0; y < DOORLIGHT_HEIGHT; y++) {
+//         short kx = key_frames[kf_cur*2];
+//         short ky = key_frames[kf_cur*2+1]+y;
 
-        int start = (ky*BMP_WIDTH+kx)*DOORLIGHT_BPP;
-        log_debug("seek %d", start);
-        unsigned long seek_time = micros();
-        bmp_file.seek(start, SeekSet);
-        //lseek(fileno(bmp_file), start, SEEK_SET);
-        total_seek_time += micros() - seek_time;
+//         int start = (ky*BMP_WIDTH+kx)*DOORLIGHT_BPP;
+//         log_debug("seek %d", start);
+//         unsigned long seek_time = micros();
+//         bmp_file.seek(start, SeekSet);
+//         //lseek(fileno(bmp_file), start, SEEK_SET);
+//         total_seek_time += micros() - seek_time;
 
-        unsigned long read_time = micros();
-        size_t s = bmp_file.read(pix, DOORLIGHT_LINE_SIZE);
-        //size_t s = read(fileno(bmp_file), pix, DOORLIGHT_LINE_SIZE);
-        total_read_time += micros() - read_time;
-        if (s < DOORLIGHT_LINE_SIZE) {
-            log_error("failed to read doorlight line, expected %d bytes, but got %d bytes", DOORLIGHT_LINE_SIZE, s);
-        }
+//         unsigned long read_time = micros();
+//         size_t s = bmp_file.read(pix, DOORLIGHT_LINE_SIZE);
+//         //size_t s = read(fileno(bmp_file), pix, DOORLIGHT_LINE_SIZE);
+//         total_read_time += micros() - read_time;
+//         if (s < DOORLIGHT_LINE_SIZE) {
+//             log_error("failed to read doorlight line, expected %d bytes, but got %d bytes", DOORLIGHT_LINE_SIZE, s);
+//         }
 
-        unsigned long draw_time = micros();
-        for (int x = 0; x < DOORLIGHT_LINE_SIZE; x += 3) {
-            draw_pixel(x/3, y, pix[x], pix[x+1], pix[x+2]);
-        }
-        total_draw_time += micros() - draw_time;
-    }
+//         unsigned long draw_time = micros();
+//         for (int x = 0; x < DOORLIGHT_LINE_SIZE; x += 3) {
+//             draw_pixel(x/3, y, pix[x], pix[x+1], pix[x+2]);
+//         }
+//         total_draw_time += micros() - draw_time;
+//     }
 
-    loaded = true;
+//     loaded = true;
 
-    log_info("key_frame %d loaded in %d ms, seeking %d μs, reading %d μs, drawing %d μs", kf_cur, millis()-frame_time, total_seek_time, total_read_time, total_draw_time);
-}
+//     log_info("key_frame %d loaded in %d ms, seeking %d μs, reading %d μs, drawing %d μs", kf_cur, millis()-frame_time, total_seek_time, total_read_time, total_draw_time);
+// }
 
 void show_next_frame() {
-    loaded = false;
-    ready_to_show = false;
+    log_debug("Showing frame");
 
     unsigned long this_millis = millis();
     log_debug("FPS %d", 1000/(this_millis - fps_last_millis));
@@ -203,21 +205,10 @@ void show_next_frame() {
 
     log_debug("key_frame show");
 
-    FastLED.show();
+    //FastLED.show();
+    display.draw();
 
     log_debug("key_frame shown");
-
-    current_keyframe++;
-    if (current_keyframe >= key_frame_count)
-        current_keyframe = 0;
-
-    ready_to_load = true;
-}    
-
-bool IRAM_ATTR flip_timer_handler(void *timerNo) {
-    if (loaded) 
-        ready_to_show = true;
-    return true;
 }
 
 void setup() {
@@ -225,24 +216,51 @@ void setup() {
     FastLED.setMaxPowerInVoltsAndMilliamps(MATRIX_VOLTS, MAX_MATRIX_AMPS);
     //FastLED.setBrightness(BRIGHTNESS);
 
+    matrix.begin();
+    display.fill_screen(mysook::Color(0, 0, 0));
+    display.put_pixel(0, 0, mysook::Color(255, 0, 0));
+    display.draw();
+
     Serial.begin(115200);
 
-    esp_log_level_set(TAG, ESP_LOG_INFO);
+    esp_log_level_set(TAG, ESP_LOG_VERBOSE);
 
-    if (flip_timer.attachInterruptInterval(300, flip_timer_handler)) {
-        log_error("Flip timer setup failed.");
-    }
-    else {
-        log_info("Flip timer setup complete.");
-    }
+    tick_timer = esp_timer_get_time();
+    // if (flip_timer.attachInterruptInterval(300, flip_timer_handler)) {
+    //     log_error("Flip timer setup failed.");
+    // }
+    // else {
+    //     log_info("Flip timer setup complete.");
+    // }
 
     init_filesystem();
+    load_animation();
 }
 
 void loop() { 
-    if (ready_to_load)
-        load_next_frame(current_keyframe);
+    std::int64_t new_tick_timer = esp_timer_get_time();
+    unsigned long millis_elapsed = (new_tick_timer - tick_timer) / 1000;
+    shown_frame_remain -= millis_elapsed;
+    tick_timer = new_tick_timer;
 
-    if (ready_to_show)
+    if (ready_to_load) {
+        ready_to_load = false;
+        load_next_frame();
+        loaded = true;
+    }
+
+    if (loaded && (shown_frame_remain <= 0)) {
+        ready_to_show = true;
+    }
+
+    if (ready_to_show) {
+        loaded = false;
+        ready_to_show = false;
         show_next_frame();
+        ready_to_load = true;
+        shown_frame_remain = loaded_frame_remain;
+    } 
+
+    // WHY DOES THIS CODE NEED A LOG MESSAGE TO WORK!?!??!?!?
+    log_info("frame_remain = %d, ready_to_load = %d, loaded = %d, ready_to_show = %d", shown_frame_remain, ready_to_load, loaded, ready_to_show);
 }

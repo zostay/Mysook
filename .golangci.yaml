@@ -1,0 +1,48 @@
+---
+run:
+  concurrency: 4
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    - depguard
+    - errorlint
+    - errname
+    - exhaustive
+    - exportloopref
+    - gocritic
+    - godot
+    - gofmt
+    - gosec
+    - misspell
+    - nolintlint
+    - paralleltest
+    - prealloc
+    - predeclared
+    - tparallel
+    - unparam
+    - whitespace
+
+linters-settings:
+  depguard:
+    rules:
+      main:
+        files:
+          - "$all"
+          - "!$test"
+        allow:
+          - "$gostd"
+          - github.com/zostay
+
+      tests:
+        files:
+          - "$test"
+        allow:
+          - "$gostd"
+          - github.com/zostay
