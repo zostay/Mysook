@@ -16,10 +16,10 @@ var _ image.Image = (*Image)(nil)
 
 // At returns the color of the given pixel.
 func (i *Image) At(x, y int) color.Color {
-	idx := (int32(y)-i.Rect.Min.Y)*i.stride + (int32(x) - i.Rect.Min.X)
+	idx := (int32(y)-i.Rect.Min.Y)*i.stride + (int32(x)-i.Rect.Min.X)*3
 	r := i.PixelData[idx]
-	g := i.PixelData[idx]
-	b := i.PixelData[idx]
+	g := i.PixelData[idx+1]
+	b := i.PixelData[idx+2]
 
 	return color.NRGBA{R: r, G: g, B: b, A: 0xFF}
 }
@@ -50,7 +50,7 @@ func NewImage(bounds image.Rectangle, pixelData []byte) *Image {
 				Y: int32(bounds.Max.Y),
 			},
 		},
-		stride:    int32(bounds.Max.X - bounds.Min.X),
+		stride:    int32(bounds.Max.X-bounds.Min.X) * 3,
 		PixelData: pixelData,
 	}
 }

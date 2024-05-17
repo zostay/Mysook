@@ -3,6 +3,7 @@ package manic
 import (
 	"image"
 	"image/color"
+	"math"
 	"os"
 )
 
@@ -88,7 +89,8 @@ func (b *Builder) AddScanlineKeyframes(
 	idx uint16, // image index
 	sx, sy uint16, // start x, y
 	ex, ey uint16, // end x, y
-	millis uint16, // milliseconds for the whole animation
+	millisTotal uint16, // milliseconds for the whole animation
+	millisPerFrame uint16, // milliseconds per frame
 	count int, // number of keyframes to add
 	ease Easing, // easing function (nil for linear)
 ) (uint16, uint16) {
@@ -96,24 +98,19 @@ func (b *Builder) AddScanlineKeyframes(
 		ease = Linear
 	}
 
-	dx := float64(ex-sx) / float64(count)
-	dy := float64(ey-sy) / float64(count)
-	dMillis := float64(millis) / float64(count)
+	firstFrame := len(b.anim.Keyframes)
 
-	var (
-		x = float64(sx)
-		y = float64(sy)
-		f = float64(0)
-	)
-	for range count {
-		fm := uint16(dMillis * ease(f))
-		b.AddKeyframe(idx, int32(x), int32(y), fm)
-		x += dx
-		y += dy
-		f += 1 / float64(count)
+	frameCount := float64(millisTotal) / float64(millisPerFrame)
+	for f := 0.0; f < frameCount; f++ {
+		x := float64(sx) + float64(ex-sx)*ease(f/frameCount)
+		y := float64(sy) + float64(ey-sy)*ease(f/frameCount)
+		// TODO Compress the frames by combining sequences of idential (x, y) frames.
+		b.AddKeyframe(idx, int32(math.Round(x)), int32(math.Round(y)), millisPerFrame)
 	}
 
-	return uint16(len(b.anim.Keyframes) - count), uint16(len(b.anim.Keyframes))
+	lastFrame := len(b.anim.Keyframes)
+
+	return uint16(firstFrame), uint16(lastFrame)
 }
 
 // Animation returns the constructed animation.
