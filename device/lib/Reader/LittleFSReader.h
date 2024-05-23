@@ -9,13 +9,13 @@ class LittleFSReader : public Reader {
     fs::File &file;
 
 public:
-    ArduinoFileDelegate(fs::File &file) : file(file) { }
+    LittleFSReader(fs::File &file) : file(file) { }
 
-    void read(char *buf, size_t len) {
+    virtual void read(char *buf, size_t len) {
         file.readBytes(buf, len);
     }
 
-    void seekg(size_t pos) {
+    virtual void seekg(size_t pos) {
         file.seek(pos, fs::SeekSet);
     }
 };

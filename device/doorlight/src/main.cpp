@@ -1,23 +1,7 @@
-#define MATRIX_WIDTH  32
-#define MATRIX_HEIGHT 8
-
 #ifdef ARDUINO
 #include <Arduino.h>
-
-#include "esp_log.h"
-
-#ifdef USE_LittleFS
-  // merged into esp32 core since 1.0.6
-  // #include <LITTLEFS.h>
-  #include <LittleFS.h>
-
-  // FS *filesystem = &LITTLEFS;
-  #define LITTLEFS LittleFS
-  #define SPIFFS LITTLEFS
-  #define FileFS LITTLEFS
-  #define FS_NAME "LittleFS"
-#else
-  #include <SPIFFS.h>
+#include <LittleFS.h>
+#define LITTLEFS LittleFS
 #endif
 
 #include "FastLED.h"
@@ -26,30 +10,34 @@
 
 #include <Animation.h>
 #include <Firmware.h>
+
+#ifdef ARDUINO
 #include <MC_Panel.h>
 #include <MC_Logger.h>
-
-FastLED_NeoMatrix matrix(strip, MATRIX_WIDTH, MATRIX_HEIGHT, 1, 2, 
-    NEO_MATRIX_BOTTOM | NEO_MATRIX_RIGHT | NEO_MATRIX_COLUMNS 
-        | NEO_MATRIX_ZIGZAG | NEO_TILE_ZIGZAG);
+#include <LittleFSReader.h>
 
 mysook::MC_Logger<Print> logger(&micros, Serial);
 #endif//ARDUINO
+
+#define DOORLIGHT_WIDTH     32
+#define DOORLIGHT_HEIGHT    16
+
+#define MATRIX_WIDTH  32
+#define MATRIX_HEIGHT 8
+
+#define N_LEDS (DOORLIGHT_WIDTH*DOORLIGHT_HEIGHT)
+
+static CRGB strip[N_LEDS];
+FastLED_NeoMatrix matrix(strip, MATRIX_WIDTH, MATRIX_HEIGHT, 1, 2, 
+    NEO_MATRIX_BOTTOM | NEO_MATRIX_RIGHT | NEO_MATRIX_COLUMNS 
+        | NEO_MATRIX_ZIGZAG | NEO_TILE_ZIGZAG);
 
 #include "doorlight.h"
 
 static const char *TAG = "DoorLight";
 
-#define log_verbose(fmt, ...) ESP_LOGV(TAG, fmt, ##__VA_ARGS__)
-#define log_debug(fmt, ...)   ESP_LOGD(TAG, fmt, ##__VA_ARGS__)
-#define log_info(fmt, ...)    ESP_LOGI(TAG, fmt, ##__VA_ARGS__)
-#define log_error(fmt, ...)   ESP_LOGE(TAG, fmt, ##__VA_ARGS__)
-
-//static FILE *bmp_file;
 static File bmp_file;
 
-#define DOORLIGHT_WIDTH     32
-#define DOORLIGHT_HEIGHT    16
 #define DOORLIGHT_BPP       3
 #define DOORLIGHT_LINE_SIZE (DOORLIGHT_WIDTH * DOORLIGHT_BPP)
 
@@ -58,7 +46,6 @@ static File bmp_file;
 #define BMP_HEIGHT    320
 
 #define MATRIX_PIN 23
-#define N_LEDS (DOORLIGHT_WIDTH*DOORLIGHT_HEIGHT)
 
 #define MATRIX_VOLTS    5
 #define MAX_MATRIX_AMPS 2000
@@ -71,13 +58,15 @@ static std::int64_t tick_timer = 0;
 static long loaded_frame_remain = 0;
 static long shown_frame_remain = 0;
 static int current_keyframe = 0;
-static CRGB strip[N_LEDS];
 
 #ifdef ARDUINO
-static std::unique_ptr<mysook::Animation<mysook::ArduinoFileDelegate>> animation;
-#else//ARDUINO
-static std::unique_ptr<mysook::Animation<std::istream>> animation;
+static std::unique_ptr<mysook::LittleFSReader> file;
 #endif//ARDUINO
+
+std::unique_ptr<mysook::Animation> animation;
+mysook::MC_RGBPanel<DOORLIGHT_WIDTH, DOORLIGHT_HEIGHT, FastLED_NeoMatrix> display(matrix);
+mysook::Animator<DOORLIGHT_WIDTH, DOORLIGHT_HEIGHT> animator(logger, display);
+Doorlight<DOORLIGHT_WIDTH, DOORLIGHT_HEIGHT> doorlight(logger, animator);
 
 static bool ready_to_load = true;
 static bool loaded = false;
@@ -85,81 +74,43 @@ static bool ready_to_show = false;
 
 static unsigned long fps_last_millis = millis();
 
-mysook::MC_RGBPanel<DOORLIGHT_WIDTH, DOORLIGHT_HEIGHT, FastLED_NeoMatrix> display(matrix);
-
-#ifdef ARDUINO
-Doorlight<mysook::ArduinoFileDelegate> doorlight(log, animation);
-#else//ARDUINO
-Doorlight<std::istream> doorlight(log, animation);
-#endif//ARDUINO
-
 void init_filesystem() {
-    log_info("SPIFFS initialization start");
+    logger.logf_ln("I [main] LittleFS initialization start");
 
-    if (!SPIFFS.begin()) {
-        log_error("Failed to start SPIFFS.");
+    if (!LittleFS.begin()) {
+        logger.logf_ln("E [main] Failed to start LittleFS.");
     }
-    //esp_vfs_spiffs_conf_t spiffs_config = {
-    //    base_path       : "/spiffs",
-    //    partition_label : NULL,
-    //    max_files       : 12,
-    //};
-    
-    // register file system
-    //esp_err_t ret = esp_vfs_spiffs_register(&spiffs_config);
 
-    //if (ret != ESP_OK) {
-    //    if (ret == ESP_FAIL) {
-    //        log_error("Failed to mount or format filesystem");
-    //    } else if (ret == ESP_ERR_NOT_FOUND) {
-    //        log_error("Failed to find SPIFFS partition");
-    //    } else {
-    //        log_error("Failed to initialize SPIFFS (%s)", esp_err_to_name(ret));
-    //    }
-    //    return;
-    //}
-
-    log_info("SPIFFS initialization complete");
+    logger.logf_ln("I [main] LittleFS initialization complete");
 }
 
 void load_animation() {
-    log_info("Open bitmap file start");
+    logger.logf_ln("I [main] Open bitmap file start");
 
-    bmp_file = SPIFFS.open("/congrats-logan.manic", "r");
+    bmp_file = LittleFS.open("/congrats-logan.manic", "r");
     if (!bmp_file) {
-        log_error("Failed to open bitmap file.");
+        logger.logf_ln("E [main] Failed to open bitmap file.");
         return;
     }
-    //bmp_file = fopen("/spiffs/latte.data", "r");
-    //if (bmp_file == NULL) {
-    //    log_error("Failed to open test-image.data file.");
-    //    return;
-    //}
 
-    log_info("Parsing bitmap file.");
+    file.reset(new mysook::LittleFSReader(bmp_file));
 
-    animation.reset(new mysook::Animation(bmp_file));
+    logger.logf_ln("I [main] Parsing bitmap file.");
 
-    log_info("Open bitmap file complete, size is %d bytes", bmp_file.size());
+    animation.reset(new mysook::Animation(logger, *file.get()));
 
-    log_info("SPIFFS initialization complete");
+    logger.logf_ln("I [main] Open bitmap file complete, size is %d bytes", bmp_file.size());
 }
 
-// Map pixels into the matrix grid
-// void draw_pixel(uint8_t x, uint8_t y, uint8_t r, uint8_t g, uint8_t b) {
-//     log_verbose("(%2d, %2d) <- %02X%02X%02X", x, y, r, g, b);
-//     display.put_pixel(x, y, mysook::Color(r, g, b));
+// static std::uint8_t blink = 0;
+// void load_next_frame() {
+//     log_debug("Loading frame %d", current_keyframe);
+//     loaded_frame_remain = animation.get()->frame_time(current_keyframe);
+//     current_keyframe = animation.get()->render(&display, current_keyframe, bmp_file);
+//     display.put_pixel(0, 0, mysook::Color(blink, 0, 0));
+//     blink = blink == 0 ? 255 : 0;
+//     log_debug("Frame is loaded.");
 // }
-
-static std::uint8_t blink = 0;
-void load_next_frame() {
-    log_debug("Loading frame %d", current_keyframe);
-    loaded_frame_remain = animation.get()->frame_time(current_keyframe);
-    current_keyframe = animation.get()->render(&display, current_keyframe, bmp_file);
-    display.put_pixel(0, 0, mysook::Color(blink, 0, 0));
-    blink = blink == 0 ? 255 : 0;
-    log_debug("Frame is loaded.");
-}
 
 // void load_next_frame(short kf_cur) {
 //     ready_to_load = false;
@@ -213,20 +164,20 @@ void load_next_frame() {
 //     log_info("key_frame %d loaded in %d ms, seeking %d μs, reading %d μs, drawing %d μs", kf_cur, millis()-frame_time, total_seek_time, total_read_time, total_draw_time);
 // }
 
-void show_next_frame() {
-    log_debug("Showing frame");
+// void show_next_frame() {
+//     log_debug("Showing frame");
 
-    unsigned long this_millis = millis();
-    log_debug("FPS %d", 1000/(this_millis - fps_last_millis));
-    fps_last_millis = this_millis;
+//     unsigned long this_millis = millis();
+//     log_debug("FPS %d", 1000/(this_millis - fps_last_millis));
+//     fps_last_millis = this_millis;
 
-    log_debug("key_frame show");
+//     log_debug("key_frame show");
 
-    //FastLED.show();
-    display.draw();
+//     //FastLED.show();
+//     display.draw();
 
-    log_debug("key_frame shown");
-}
+//     log_debug("key_frame shown");
+// }
 
 void setup() {
 #ifdef ARDUINO
@@ -241,7 +192,7 @@ void setup() {
 
     Serial.begin(115200);
 
-    esp_log_level_set(TAG, ESP_LOG_VERBOSE);
+    // esp_log_level_set(TAG, ESP_LOG_VERBOSE);
 
     tick_timer = esp_timer_get_time();
     // if (flip_timer.attachInterruptInterval(300, flip_timer_handler)) {
@@ -260,29 +211,29 @@ void setup() {
 
 void loop() { 
     doorlight.loop();
-    std::int64_t new_tick_timer = esp_timer_get_time();
-    unsigned long millis_elapsed = (new_tick_timer - tick_timer) / 1000;
-    shown_frame_remain -= millis_elapsed;
-    tick_timer = new_tick_timer;
+    // std::int64_t new_tick_timer = esp_timer_get_time();
+    // unsigned long millis_elapsed = (new_tick_timer - tick_timer) / 1000;
+    // shown_frame_remain -= millis_elapsed;
+    // tick_timer = new_tick_timer;
 
-    if (ready_to_load) {
-        ready_to_load = false;
-        load_next_frame();
-        loaded = true;
-    }
+    // if (ready_to_load) {
+    //     ready_to_load = false;
+    //     load_next_frame();
+    //     loaded = true;
+    // }
 
-    if (loaded && (shown_frame_remain <= 0)) {
-        ready_to_show = true;
-    }
+    // if (loaded && (shown_frame_remain <= 0)) {
+    //     ready_to_show = true;
+    // }
 
-    if (ready_to_show) {
-        loaded = false;
-        ready_to_show = false;
-        show_next_frame();
-        ready_to_load = true;
-        shown_frame_remain = loaded_frame_remain;
-    } 
+    // if (ready_to_show) {
+    //     loaded = false;
+    //     ready_to_show = false;
+    //     show_next_frame();
+    //     ready_to_load = true;
+    //     shown_frame_remain = loaded_frame_remain;
+    // } 
 
-    // WHY DOES THIS CODE NEED A LOG MESSAGE TO WORK!?!??!?!?
-    log_info("frame_remain = %d, ready_to_load = %d, loaded = %d, ready_to_show = %d", shown_frame_remain, ready_to_load, loaded, ready_to_show);
+    // // WHY DOES THIS CODE NEED A LOG MESSAGE TO WORK!?!??!?!?
+    // log_info("frame_remain = %d, ready_to_load = %d, loaded = %d, ready_to_show = %d", shown_frame_remain, ready_to_load, loaded, ready_to_show);
 }

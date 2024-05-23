@@ -182,6 +182,10 @@ public:
 
         return pdata;
     }
+
+    std::uint16_t frame_count() const {
+        return keyframes.size();
+    }
 };
 
 /*
@@ -190,14 +194,17 @@ public:
 template<int W, int H> 
 class Animator : public Ticking {
     RGBPanel<W, H> &panel;
+    Logger &log;
     Animation *animation;
 
     bool ready_to_load = true;
+    bool ready_to_show = false;
+    unsigned long next_frame_time = 0;
     unsigned long next_tick = 0;
     std::uint16_t frame_num = 0;
 
 public:
-    Animator(RGBPanel<W, H> &panel) : panel(panel) { }
+    Animator(Logger &log, RGBPanel<W, H> &panel) : log(log), panel(panel) { }
 
     void set_animation(Animation *animation) {
         if (animation == nullptr) {
@@ -206,12 +213,14 @@ public:
         }
 
         if (animation->frame_h != H || animation->frame_w != W) {
-            logf_ln("E [animation] Animation frame size %dx%d does not match panel size %dx%d", animation->frame_w, animation->frame_h, W, H);
+            log.logf_ln("E [animation] Animation frame size %dx%d does not match panel size %dx%d", animation->frame_w, animation->frame_h, W, H);
             clear_animation();
             return;
         }
 
         ready_to_load = true;
+        ready_to_show = false;
+        next_frame_time = 0;
         frame_num = 0;
         next_tick = 0;
 
@@ -220,6 +229,8 @@ public:
 
     void clear_animation() {
         ready_to_load = true;
+        ready_to_show = false;
+        next_frame_time = 0;
         frame_num = 0;
         next_tick = 0;
 
@@ -227,45 +238,53 @@ public:
     }
 
     virtual bool ready_for_tick(unsigned long now) {
-        return animation != nullptr && (ready_to_load || next_tick <= now);
+        if (next_frame_time != 0) {
+            next_tick = next_frame_time + now;
+            next_frame_time = 0;
+        }
+
+        ready_to_show = next_tick <= now;
+        return animation != nullptr && (ready_to_load || ready_to_show);
     }
 
-    virtual void tick(unsigned long now) {
-        if (animation == nullptr) {
+    virtual void tick() {
+        if (animation == nullptr) 
             return;
-        }
-
-        if (ready_to_load) {
+        if (ready_to_load)
             load_frame();
-        }
-
-        if (next_tick <= now) {
-            render_frame(now);
-        }
+        if (ready_to_show)
+            render_frame();
     }
 
 private:
     void load_frame() {
+        ready_to_load = false;
         std::uint8_t *pixels = animation->frame_pixels(frame_num);
 
         // something weird happened try to reset
         if (pixels == nullptr) {
-            logf_ln("E [animation] Frame %d has no pixels; flipping to frame 0", frame_num);
+            log.logf_ln("E [animation] Frame %d has no pixels; flipping to frame 0", frame_num);
             frame_num = 0;
             return;
         }
 
         for (int y = 0; y < H; y++) {
             for (int x = 0; x < W; x++) {
-                i = y * W + x;
+                int i = y * W + x;
                 panel.put_pixel(x, y, pixels[i*3], pixels[i*3+1], pixels[i*3+2]);
             }
         }
     }
 
     void render_frame() {
+        ready_to_show = false;
         frame_num = render();
-        next_tick = now + animation->frame_time(frame_num) * 1000;
+
+        next_frame_time = animation->frame_time(frame_num) * 1000;
+        if (next_frame_time == 0) {
+            next_frame_time = 1000; // minimum frame time
+        }
+
         ready_to_load = true;
     }
 
@@ -277,50 +296,7 @@ private:
      */
     std::uint16_t render() {
         panel.draw();
-        // weird state, reset to 0
-        if (frame_num >= keyframes.size()) {
-            return 0;
-        }
-
-        // ensure we don't update outside the bounds of the panel or the frame
-        int w = frame_w > W ? W : frame_w;
-        int h = frame_h > H ? H : frame_h;
-
-        AnimationKeyframe *keyframe = keyframes[frame_num].get();
-        AnimationImage *image = images[keyframe->get_img_index()].get();
-
-        // we start each row at the same x position and read a whole row at a time
-        int img_x = keyframe->get_origin_x() - image->get_bounds().min.x;
-
-        // the maximum y position in the image for bounds checking
-        int max_y = image->get_bounds().max.y - image->get_bounds().min.y;
-        
-        std::unique_ptr<uint8_t[]> pixels(new uint8_t[w*3]);
-        for (int y = 0; y < h; y++) {
-            // calculate the y position in the image
-            int img_y = y + keyframe->get_origin_y() - image->get_bounds().min.y;
-
-            // prevent reading past the end of the image
-            if (img_y > max_y) {
-                break;
-            }
-
-            // seek to the correct position in the file to read the row
-            int seekpos = image->get_pixel_origin() + img_y * image->get_stride() + img_x * 3;
-            in.seekg(seekpos, fs::SeekSet);
-            // log_debug("seekpos: %x", image->get_pixel_origin());
-
-            // read the row of pixels and update the panel
-            uint8_t *row = pixels.get();
-            in.read((char*) row, w*3);
-            for (int x = 0; x < w; x++) {
-                //log_debug("put_pixel(%d, %d) <- #%02x%02x%02x", x, y, row[x*3], row[x*3+1], row[x*3+2]);
-                panel->put_pixel(x, y, row[x*3], row[x*3+1], row[x*3+2]);
-            }
-        }
-
-        // next frame or 0 if we reached the end of the animation
-        return (frame_num + 1) % keyframes.size();
+        return (frame_num + 1) % animation->frame_count();
     }
 };
 

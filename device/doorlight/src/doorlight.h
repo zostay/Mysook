@@ -5,21 +5,21 @@
 #include <Logger.h>
 #include <Animation.h>
 
-template <class F>
+template <int W, int H>
 class Doorlight : public mysook::Firmware {
-    mysook::Animation<F> &animation;
+    mysook::Animator<W, H> &animator;
     mysook::Logger &log;
 
 public:
-    Doorlight(mysook::Logger &log, mysook::Animation<F> &animation)
-    : Firmware(log), animation(animation), log(log) {
-        this->add_pre_ticker(&animation);
+    Doorlight(mysook::Logger &log, mysook::Animator<W, H> &animator)
+    : Firmware(log), animator(animator), log(log) {
+        this->add_pre_ticker(&animator);
     }
 
     virtual unsigned long tick_speed() { return 100000; }
 
-    virtual void start();
-    virtual void tick();
+    virtual void start() {}
+    virtual void tick() {}
 };
 
 #endif//__DOORLIGHT_H

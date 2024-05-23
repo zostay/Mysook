@@ -12,7 +12,8 @@
                 "${workspaceFolder}/device/lib/Canvas32",
                 "${workspaceFolder}/device/lib/Sim_Adafruit_GFX",
                 "${workspaceFolder}/device/lib/Simduino",
-                "${workspaceFolder}/device/lib/Color"
+                "${workspaceFolder}/device/lib/Color",
+                "/Users/sterling/.platformio/packages/framework-arduinoespressif32/libraries/LittleFS/src"
             ],
             "defines": [],
             "macFrameworkPath": [
