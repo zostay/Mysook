@@ -1,3 +1,6 @@
+#define MATRIX_WIDTH  32
+#define MATRIX_HEIGHT 8
+
 #ifdef ARDUINO
 #include <Arduino.h>
 
@@ -22,8 +25,18 @@
 #include "ESP32TimerInterrupt.h"
 
 #include <Animation.h>
+#include <Firmware.h>
 #include <MC_Panel.h>
+#include <MC_Logger.h>
+
+FastLED_NeoMatrix matrix(strip, MATRIX_WIDTH, MATRIX_HEIGHT, 1, 2, 
+    NEO_MATRIX_BOTTOM | NEO_MATRIX_RIGHT | NEO_MATRIX_COLUMNS 
+        | NEO_MATRIX_ZIGZAG | NEO_TILE_ZIGZAG);
+
+mysook::MC_Logger<Print> logger(&micros, Serial);
 #endif//ARDUINO
+
+#include "doorlight.h"
 
 static const char *TAG = "DoorLight";
 
@@ -34,9 +47,6 @@ static const char *TAG = "DoorLight";
 
 //static FILE *bmp_file;
 static File bmp_file;
-
-#define MATRIX_WIDTH  32
-#define MATRIX_HEIGHT 8
 
 #define DOORLIGHT_WIDTH     32
 #define DOORLIGHT_HEIGHT    16
@@ -63,7 +73,11 @@ static long shown_frame_remain = 0;
 static int current_keyframe = 0;
 static CRGB strip[N_LEDS];
 
-static std::unique_ptr<mysook::Animation> animation;
+#ifdef ARDUINO
+static std::unique_ptr<mysook::Animation<mysook::ArduinoFileDelegate>> animation;
+#else//ARDUINO
+static std::unique_ptr<mysook::Animation<std::istream>> animation;
+#endif//ARDUINO
 
 static bool ready_to_load = true;
 static bool loaded = false;
@@ -71,10 +85,13 @@ static bool ready_to_show = false;
 
 static unsigned long fps_last_millis = millis();
 
-FastLED_NeoMatrix matrix(strip, MATRIX_WIDTH, MATRIX_HEIGHT, 1, 2, 
-    NEO_MATRIX_BOTTOM | NEO_MATRIX_RIGHT | NEO_MATRIX_COLUMNS 
-        | NEO_MATRIX_ZIGZAG | NEO_TILE_ZIGZAG);
 mysook::MC_RGBPanel<DOORLIGHT_WIDTH, DOORLIGHT_HEIGHT, FastLED_NeoMatrix> display(matrix);
+
+#ifdef ARDUINO
+Doorlight<mysook::ArduinoFileDelegate> doorlight(log, animation);
+#else//ARDUINO
+Doorlight<std::istream> doorlight(log, animation);
+#endif//ARDUINO
 
 void init_filesystem() {
     log_info("SPIFFS initialization start");
@@ -212,6 +229,7 @@ void show_next_frame() {
 }
 
 void setup() {
+#ifdef ARDUINO
     FastLED.addLeds<NEOPIXEL, MATRIX_PIN>(strip, N_LEDS);
     FastLED.setMaxPowerInVoltsAndMilliamps(MATRIX_VOLTS, MAX_MATRIX_AMPS);
     //FastLED.setBrightness(BRIGHTNESS);
@@ -235,9 +253,13 @@ void setup() {
 
     init_filesystem();
     load_animation();
+#endif//ARDUINO
+
+    doorlight.setup();
 }
 
 void loop() { 
+    doorlight.loop();
     std::int64_t new_tick_timer = esp_timer_get_time();
     unsigned long millis_elapsed = (new_tick_timer - tick_timer) / 1000;
     shown_frame_remain -= millis_elapsed;

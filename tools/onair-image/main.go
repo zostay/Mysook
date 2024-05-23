@@ -7,8 +7,7 @@ import (
 
 	"github.com/fogleman/gg"
 	"github.com/pbnjay/pixfont"
-
-	"github.com/zostay/Mysook/internal/image/mysook"
+	"github.com/zostay/Mysook/internal/image/manic"
 )
 
 const (
@@ -17,9 +16,15 @@ const (
 )
 
 var (
-	keyframes = mysook.Keyframes{
-		{0, 0, 5000},
-		{32, 0, 5000},
+	keyframes = []manic.Keyframe{
+		{
+			Origin: manic.Point{X: 0, Y: 0},
+			Millis: 5000,
+		},
+		{
+			Origin: manic.Point{X: 32, Y: 0},
+			Millis: 5000,
+		},
 	}
 )
 
@@ -56,12 +61,29 @@ func main() {
 
 	pixfont.DrawString(im, 48-airWidth/2, 9, airStr, black)
 
-	dc.SavePNG("onair.png")
+	err := dc.SavePNG("onair.png")
+	if err != nil {
+		panic(err)
+	}
+
+	b := manic.NewBuilder(32, 16)
+	idx, err := b.AddImageFile("onair.png")
+	if err != nil {
+		panic(err)
+	}
+
+	for _, kf := range keyframes {
+		b.AddKeyframe(idx, kf.Origin.X, kf.Origin.Y, kf.Millis)
+	}
 
 	w, err := os.Create("onair.mysook")
 	if err != nil {
 		panic(err)
 	}
+	defer w.Close()
 
-	mysook.Encode(w, keyframes, im)
+	err = manic.Encode(w, b.Animation())
+	if err != nil {
+		panic(err)
+	}
 }

@@ -39,6 +39,8 @@ linters-settings:
         allow:
           - "$gostd"
           - github.com/zostay
+          - github.com/fogleman/gg
+          - github.com/pbnjay/pixfont
 
       tests:
         files:
