@@ -9,7 +9,10 @@
                 "${workspaceFolder}/device/lib/Manic",
                 "${workspaceFolder}/device/lib/Logger",
                 "${workspaceFolder}/device/lib/Reader",
-                "${workspaceFolder}/device/lib/Canvas32"
+                "${workspaceFolder}/device/lib/Canvas32",
+                "${workspaceFolder}/device/lib/Sim_Adafruit_GFX",
+                "${workspaceFolder}/device/lib/Simduino",
+                "${workspaceFolder}/device/lib/Color"
             ],
             "defines": [],
             "macFrameworkPath": [

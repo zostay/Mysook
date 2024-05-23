@@ -7,29 +7,14 @@
 #include <memory>
 
 #ifdef ARDUINO
-#ifdef USE_LittleFS
-  #include <LittleFS.h>
-#endif//USE_LittleFS
+#include <LittleFS.h>
 #include <Stream.h>
 #endif//ARDUINO
-
-#ifdef ESP_PLATFORM
-#include "esp_log.h"
-static const char *ANIM_TAG = "Animation";
-#define log_verbose(fmt, ...) ESP_LOGV(ANIM_TAG, fmt, ##__VA_ARGS__)
-#define log_debug(fmt, ...)   ESP_LOGD(ANIM_TAG, fmt, ##__VA_ARGS__)
-#define log_info(fmt, ...)    ESP_LOGI(ANIM_TAG, fmt, ##__VA_ARGS__)
-#define log_error(fmt, ...)   ESP_LOGE(ANIM_TAG, fmt, ##__VA_ARGS__)
-#else//ESP_PLATFORM
-#define log_verbose(fmt, ...)
-#define log_debug(fmt, ...)
-#define log_info(fmt, ...)
-#define log_error(fmt, ...)
-#endif//ESP_PLATFORM
 
 #include <Firmware.h>
 #include <Panel.h>
 #include <Reader.h>
+#include <Logger.h>
 
 namespace mysook {
 
@@ -56,14 +41,15 @@ class AnimationKeyframe {
     std::uint16_t img_index;
     std::int32_t origin_x, origin_y;
     std::uint16_t millis;
+    Logger &log;
 
 public:
-    AnimationKeyframe(F &in) {
+    AnimationKeyframe(Logger &log, Reader &in) : log(log) {
         in.read((char*) &img_index, 2);
-        in.read((char*) &origin_x, 4;
+        in.read((char*) &origin_x, 4);
         in.read((char*) &origin_y, 4);
         in.read((char*) &millis, 2);
-        logf_ln("D [animation] Read keyframe: %d %d %d %d", img_index, origin_x, origin_y, millis);
+        log.logf_ln("D [animation] Read keyframe: %d %d %d %d", img_index, origin_x, origin_y, millis);
     }
 
     std::uint16_t get_img_index() const { return img_index; }
@@ -72,23 +58,21 @@ public:
     std::uint16_t get_millis() const { return millis; }
 };
 
-template <class F>
 class AnimationImage {
     AnimationRect bounds;
     std::uint32_t pixel_origin;
     std::uint32_t stride;
+    Logger &log;
 
 public:
-    AnimationImage(AnimationRect &bounds);
-
     /**
      * This constuctor reads an Image from an input stream, reading the bounds.
      */
-    AnimationImage(F &in) {
+    AnimationImage(Logger &log, Reader &in) : log(log) {
         in.read((char*) &bounds, sizeof(bounds));
         in.read((char*) pixel_origin, 4);
         stride = (bounds.max.x - bounds.min.x) * 3;
-        logf_ln("D [animation] Read image: %x %x %x %x %x %x %x", bounds.min.x, bounds.min.y, bounds.max.x, bounds.max.y, pixel_origin, stride);
+        log.logf_ln("D [animation] Read image: %x %x %x %x %x %x %x", bounds.min.x, bounds.min.y, bounds.max.x, bounds.max.y, pixel_origin, stride);
     }
 
     AnimationRect get_bounds() const { return bounds; }
@@ -96,13 +80,15 @@ public:
     std::uint32_t get_stride() const { return stride; }
 };
 
-template <class F>
 class Animation {
     char version;
     std::uint16_t frame_w, frame_h;
-    std::vector<std::unique_ptr<AnimationKeyframe<F>>> keyframes;
-    std::vector<std::unique_ptr<AnimationImage<F>>> images;
-    F &in;
+    std::vector<std::unique_ptr<AnimationKeyframe>> keyframes;
+    std::vector<std::unique_ptr<AnimationImage>> images;
+    Reader &in;
+    std::unique_ptr<std::uint8_t[]> pixels;
+
+    Logger &log;
 
 public:
     /**
@@ -115,49 +101,54 @@ public:
      * The stream should be left open. The animation can then use the stream to
      * render individual frames.
      */
-    Animation(F &in) {
-        logf_ln("I [animation] Reading Animation header");
+    Animation(Logger &log, Reader &in) : log(log), in(in) {
+        log.logf_ln("I [animation] Reading Animation header");
         char magic[5];
         in.read((char*) magic, 5);
         in.read((char*) &version, 1);
         in.read((char*) &frame_w, 2);
         in.read((char*) &frame_h, 2);
 
+        pixels.reset(new std::uint8_t[frame_w*frame_h*3]);
+
         std::uint16_t numKeyframes, numImages;
         in.read((char*) &numKeyframes, 2);
         in.read((char*) &numImages, 2);
 
-        logf_ln("I [animation] Reading %d keyframes", numKeyframes);
+        log.logf_ln("I [animation] Reading %d keyframes", numKeyframes);
         for (int i = 0; i < numKeyframes; i++) {
-            std::unique_ptr<AnimationKeyframe> keyframe(new AnimationKeyframe(in));
-            logf_ln("I [animation] Animation header read: %d %d", keyframe.get()->get_img_index(), keyframe.get()->get_millis());
+            std::unique_ptr<AnimationKeyframe> keyframe(new AnimationKeyframe(log, in));
+            log.logf_ln("I [animation] Animation header read: %d %d", keyframe.get()->get_img_index(), keyframe.get()->get_millis());
             keyframes.push_back(std::move(keyframe));
         }
 
-        logf_ln("I [animation] Reading %d images", numImages);
+        log.logf_ln("I [animation] Reading %d images", numImages);
         for (int i = 0; i < numImages; i++) {
-            std::unique_ptr<AnimationImage> image(new AnimationImage(in));
+            std::unique_ptr<AnimationImage> image(new AnimationImage(log, in));
             images.push_back(std::move(image));
         }
 
-        logf_ln("I [animation] Animation loaded");
+        log.logf_ln("I [animation] Animation loaded");
     }
     
     /**
-     * Render a frame of the animation to the panel. You specify the panel to
-     * write to and the frame number to render. This function returns the next
-     * frame number in the sequence.
+     * This is the amount of time the animation should hold on the given frame.
      */
-    template<int W, int H> 
-    std::uint16_t render(mysook::RGBPanel<W, H> *panel, std::uint16_t frame_num, std::istream &in) {
+    std::uint16_t frame_time(std::uint16_t frame_num) const {
+        return keyframes[frame_num].get()->get_millis();
+    }
+
+    /**
+     * This function returns the pixels for the given frame number. The pointer
+     * returned is allocated by this class and owned by this class and should
+     * not be freed. The data in this pointer will be overwritten during a
+     * subsequent call to this function.
+     */
+    std::uint8_t *frame_pixels(std::uint16_t frame_num) const {
         // weird state, reset to 0
         if (frame_num >= keyframes.size()) {
-            return 0;
+            return nullptr;
         }
-
-        // ensure we don't update outside the bounds of the panel or the frame
-        int w = frame_w > W ? W : frame_w;
-        int h = frame_h > H ? H : frame_h;
 
         AnimationKeyframe *keyframe = keyframes[frame_num].get();
         AnimationImage *image = images[keyframe->get_img_index()].get();
@@ -168,8 +159,9 @@ public:
         // the maximum y position in the image for bounds checking
         int max_y = image->get_bounds().max.y - image->get_bounds().min.y;
         
-        std::unique_ptr<uint8_t[]> pixels(new uint8_t[w*3]);
-        for (int y = 0; y < h; y++) {
+        std::uint8_t *pdata = pixels.get();
+        int offset = 0;
+        for (int y = 0; y < frame_h; y++) {
             // calculate the y position in the image
             int img_y = y + keyframe->get_origin_y() - image->get_bounds().min.y;
 
@@ -181,74 +173,14 @@ public:
             // seek to the correct position in the file to read the row
             int seekpos = image->get_pixel_origin() + img_y * image->get_stride() + img_x * 3;
             in.seekg(seekpos);
-
-            // read the row of pixels and update the panel
-            std::uint8_t *row = pixels.get();
-            in.read((char*) row, w*3);
-            for (int x = 0; x < w; x++) {
-                panel->put_pixel(x, y, row[x*3], row[x*3+1], row[x*3+2]);
-            }
-        }
-
-        // next frame or 0 if we reached the end of the animation
-        return (frame_num + 1) % keyframes.size();
-    }
-
-#ifdef ARDUINO
-    template<int W, int H> 
-    std::uint16_t render(mysook::RGBPanel<W, H> *panel, std::uint16_t frame_num, fs::File &stream) {
-        // weird state, reset to 0
-        if (frame_num >= keyframes.size()) {
-            return 0;
-        }
-
-        // ensure we don't update outside the bounds of the panel or the frame
-        int w = frame_w > W ? W : frame_w;
-        int h = frame_h > H ? H : frame_h;
-
-        AnimationKeyframe *keyframe = keyframes[frame_num].get();
-        AnimationImage *image = images[keyframe->get_img_index()].get();
-
-        // we start each row at the same x position and read a whole row at a time
-        int img_x = keyframe->get_origin_x() - image->get_bounds().min.x;
-
-        // the maximum y position in the image for bounds checking
-        int max_y = image->get_bounds().max.y - image->get_bounds().min.y;
-        
-        std::unique_ptr<uint8_t[]> pixels(new uint8_t[w*3]);
-        for (int y = 0; y < h; y++) {
-            // calculate the y position in the image
-            int img_y = y + keyframe->get_origin_y() - image->get_bounds().min.y;
-
-            // prevent reading past the end of the image
-            if (img_y > max_y) {
-                break;
-            }
-
-            // seek to the correct position in the file to read the row
-            int seekpos = image->get_pixel_origin() + img_y * image->get_stride() + img_x * 3;
-            stream.seek(seekpos, fs::SeekSet);
             // log_debug("seekpos: %x", image->get_pixel_origin());
 
             // read the row of pixels and update the panel
-            uint8_t *row = pixels.get();
-            stream.readBytes((char*) row, w*3);
-            for (int x = 0; x < w; x++) {
-                //log_debug("put_pixel(%d, %d) <- #%02x%02x%02x", x, y, row[x*3], row[x*3+1], row[x*3+2]);
-                panel->put_pixel(x, y, row[x*3], row[x*3+1], row[x*3+2]);
-            }
+            in.read((char*) pdata+offset, frame_w*3);
+            offset += frame_w*3;
         }
 
-        // next frame or 0 if we reached the end of the animation
-        return (frame_num + 1) % keyframes.size();
-    }
-#endif//ARDUINO
-
-    /**
-     * This is the amount of time the animation should hold on the given frame.
-     */
-    std::uint16_t frame_time(std::uint16_t frame_num) const {
-        return keyframes[frame_num].get()->get_millis();
+        return pdata;
     }
 };
 
@@ -260,21 +192,42 @@ class Animator : public Ticking {
     RGBPanel<W, H> &panel;
     Animation *animation;
 
+    bool ready_to_load = true;
     unsigned long next_tick = 0;
+    std::uint16_t frame_num = 0;
 
 public:
     Animator(RGBPanel<W, H> &panel) : panel(panel) { }
 
     void set_animation(Animation *animation) {
+        if (animation == nullptr) {
+            clear_animation();
+            return;
+        }
+
+        if (animation->frame_h != H || animation->frame_w != W) {
+            logf_ln("E [animation] Animation frame size %dx%d does not match panel size %dx%d", animation->frame_w, animation->frame_h, W, H);
+            clear_animation();
+            return;
+        }
+
+        ready_to_load = true;
+        frame_num = 0;
+        next_tick = 0;
+
         this->animation = animation;
     }
 
     void clear_animation() {
+        ready_to_load = true;
+        frame_num = 0;
+        next_tick = 0;
+
         this->animation = nullptr;
     }
 
     virtual bool ready_for_tick(unsigned long now) {
-        return animation != nullptr && next_tick <= now;
+        return animation != nullptr && (ready_to_load || next_tick <= now);
     }
 
     virtual void tick(unsigned long now) {
@@ -282,17 +235,48 @@ public:
             return;
         }
 
-        next_tick = now + animation->frame_time(0) * 1000;
-        animation->render(&panel, 0);
+        if (ready_to_load) {
+            load_frame();
+        }
+
+        if (next_tick <= now) {
+            render_frame(now);
+        }
     }
+
+private:
+    void load_frame() {
+        std::uint8_t *pixels = animation->frame_pixels(frame_num);
+
+        // something weird happened try to reset
+        if (pixels == nullptr) {
+            logf_ln("E [animation] Frame %d has no pixels; flipping to frame 0", frame_num);
+            frame_num = 0;
+            return;
+        }
+
+        for (int y = 0; y < H; y++) {
+            for (int x = 0; x < W; x++) {
+                i = y * W + x;
+                panel.put_pixel(x, y, pixels[i*3], pixels[i*3+1], pixels[i*3+2]);
+            }
+        }
+    }
+
+    void render_frame() {
+        frame_num = render();
+        next_tick = now + animation->frame_time(frame_num) * 1000;
+        ready_to_load = true;
+    }
+
 
     /**
      * Render a frame of the animation to the panel. You specify the panel to
      * write to and the frame number to render. This function returns the next
      * frame number in the sequence.
      */
-    template<int W, int H, class F> 
-    std::uint16_t render(std::uint16_t frame_num, F &in) {
+    std::uint16_t render() {
+        panel.draw();
         // weird state, reset to 0
         if (frame_num >= keyframes.size()) {
             return 0;
@@ -338,7 +322,6 @@ public:
         // next frame or 0 if we reached the end of the animation
         return (frame_num + 1) % keyframes.size();
     }
-#endif//ARDUINO
 };
 
 };
