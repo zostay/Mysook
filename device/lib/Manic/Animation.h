@@ -70,7 +70,7 @@ public:
      */
     AnimationImage(Logger &log, Reader &in) : log(log) {
         in.read((char*) &bounds, sizeof(bounds));
-        in.read((char*) pixel_origin, 4);
+        in.read((char*) &pixel_origin, 4);
         stride = (bounds.max.x - bounds.min.x) * 3;
         log.logf_ln("D [animation] Read image: %x %x %x %x %x %x %x", bounds.min.x, bounds.min.y, bounds.max.x, bounds.max.y, pixel_origin, stride);
     }
@@ -82,7 +82,7 @@ public:
 
 class Animation {
     char version;
-    std::uint16_t frame_w, frame_h;
+    std::uint16_t fw, fh;
     std::vector<std::unique_ptr<AnimationKeyframe>> keyframes;
     std::vector<std::unique_ptr<AnimationImage>> images;
     Reader &in;
@@ -106,10 +106,10 @@ public:
         char magic[5];
         in.read((char*) magic, 5);
         in.read((char*) &version, 1);
-        in.read((char*) &frame_w, 2);
-        in.read((char*) &frame_h, 2);
+        in.read((char*) &fw, 2);
+        in.read((char*) &fh, 2);
 
-        pixels.reset(new std::uint8_t[frame_w*frame_h*3]);
+        pixels.reset(new std::uint8_t[fw*fh*3]);
 
         std::uint16_t numKeyframes, numImages;
         in.read((char*) &numKeyframes, 2);
@@ -118,7 +118,6 @@ public:
         log.logf_ln("I [animation] Reading %d keyframes", numKeyframes);
         for (int i = 0; i < numKeyframes; i++) {
             std::unique_ptr<AnimationKeyframe> keyframe(new AnimationKeyframe(log, in));
-            log.logf_ln("I [animation] Animation header read: %d %d", keyframe.get()->get_img_index(), keyframe.get()->get_millis());
             keyframes.push_back(std::move(keyframe));
         }
 
@@ -161,7 +160,7 @@ public:
         
         std::uint8_t *pdata = pixels.get();
         int offset = 0;
-        for (int y = 0; y < frame_h; y++) {
+        for (int y = 0; y < fh; y++) {
             // calculate the y position in the image
             int img_y = y + keyframe->get_origin_y() - image->get_bounds().min.y;
 
@@ -176,8 +175,8 @@ public:
             // log_debug("seekpos: %x", image->get_pixel_origin());
 
             // read the row of pixels and update the panel
-            in.read((char*) pdata+offset, frame_w*3);
-            offset += frame_w*3;
+            in.read((char*) pdata+offset, fw*3);
+            offset += fw*3;
         }
 
         return pdata;
@@ -186,21 +185,26 @@ public:
     std::uint16_t frame_count() const {
         return keyframes.size();
     }
+
+    std::uint16_t frame_w() const {
+        return fw;
+    }
+
+    std::uint16_t frame_h() const {
+        return fh;
+    }
 };
 
 /*
  * The Animator animates an Animation.
  */
 template<int W, int H> 
-class Animator : public Ticking {
+class Animator : public TickingVariableTimer {
     RGBPanel<W, H> &panel;
     Logger &log;
     Animation *animation;
 
-    bool ready_to_load = true;
-    bool ready_to_show = false;
-    unsigned long next_frame_time = 0;
-    unsigned long next_tick = 0;
+    bool needs_preload = true;
     std::uint16_t frame_num = 0;
 
 public:
@@ -212,53 +216,59 @@ public:
             return;
         }
 
-        if (animation->frame_h != H || animation->frame_w != W) {
-            log.logf_ln("E [animation] Animation frame size %dx%d does not match panel size %dx%d", animation->frame_w, animation->frame_h, W, H);
+        if (animation->frame_h() != H || animation->frame_w() != W) {
+            log.logf_ln("E [animation] Animation frame size %dx%d does not match panel size %dx%d", animation->frame_w(), animation->frame_h(), W, H);
             clear_animation();
             return;
         }
 
-        ready_to_load = true;
-        ready_to_show = false;
-        next_frame_time = 0;
+        needs_preload = true;
         frame_num = 0;
-        next_tick = 0;
 
         this->animation = animation;
+
+        nudge_tick();
     }
 
     void clear_animation() {
-        ready_to_load = true;
-        ready_to_show = false;
-        next_frame_time = 0;
+        needs_preload = true;
         frame_num = 0;
-        next_tick = 0;
 
         this->animation = nullptr;
     }
 
-    virtual bool ready_for_tick(unsigned long now) {
-        if (next_frame_time != 0) {
-            next_tick = next_frame_time + now;
-            next_frame_time = 0;
-        }
+    // virtual bool ready_for_tick(unsigned long now) {
+    //     log.logf_ln("D [animation] Ready? %d %f", animation != nullptr && (ready_to_load || ready_to_show), float(now)/1000000);
 
-        ready_to_show = next_tick <= now;
-        return animation != nullptr && (ready_to_load || ready_to_show);
-    }
+    //     if (next_frame_time != 0) {
+    //         next_tick = next_frame_time + now;
+    //         next_frame_time = 0;
+    //     }
+
+    //     ready_to_show = next_tick <= now;
+    //     return animation != nullptr && (ready_to_load || ready_to_show);
+    // }
 
     virtual void tick() {
         if (animation == nullptr) 
             return;
-        if (ready_to_load)
+
+        // immediately load and render the first frame
+        if (needs_preload) {
+            needs_preload = false;
             load_frame();
-        if (ready_to_show)
-            render_frame();
+        }
+
+        render_frame();
+
+        next_tick_after(animation->frame_time(frame_num) * 1000);
+        frame_num = (frame_num + 1) % animation->frame_count();
+        load_frame();
     }
 
 private:
     void load_frame() {
-        ready_to_load = false;
+        log.logf_ln("D [animation] Load Frame");
         std::uint8_t *pixels = animation->frame_pixels(frame_num);
 
         // something weird happened try to reset
@@ -277,26 +287,8 @@ private:
     }
 
     void render_frame() {
-        ready_to_show = false;
-        frame_num = render();
-
-        next_frame_time = animation->frame_time(frame_num) * 1000;
-        if (next_frame_time == 0) {
-            next_frame_time = 1000; // minimum frame time
-        }
-
-        ready_to_load = true;
-    }
-
-
-    /**
-     * Render a frame of the animation to the panel. You specify the panel to
-     * write to and the frame number to render. This function returns the next
-     * frame number in the sequence.
-     */
-    std::uint16_t render() {
+        log.logf_ln("D [animation] Render Frame");
         panel.draw();
-        return (frame_num + 1) % animation->frame_count();
     }
 };
 

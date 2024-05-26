@@ -91,7 +91,6 @@ func (b *Builder) AddScanlineKeyframes(
 	ex, ey uint16, // end x, y
 	millisTotal uint16, // milliseconds for the whole animation
 	millisPerFrame uint16, // milliseconds per frame
-	count int, // number of keyframes to add
 	ease Easing, // easing function (nil for linear)
 ) (uint16, uint16) {
 	if ease == nil {

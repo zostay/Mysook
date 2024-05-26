@@ -11,14 +11,35 @@ protected:
     unsigned long (*_micros)();
     T &serial;
 
+    bool _enabled[26];
+
 public:
-    MC_Logger(unsigned long (*_micros)(), T &serial) : _micros(_micros), serial(serial) { }
+    MC_Logger(unsigned long (*_micros)(), T &serial) : _micros(_micros), serial(serial) { 
+        set_enabled('I');
+        set_enabled('W');
+        set_enabled('E');
+        set_enabled('F');
+    }
     MC_Logger(unsigned long (*_micros)(), T *serial) : MC_Logger(_micros, *serial) { }
+
+    void set_enabled(const char level) {
+        _enabled[level-'A'] = true;
+    }
+    
+    void set_disabled(const char level) {
+        _enabled[level-'A'] = false;
+    }
+
+    bool is_enabled(const char level) {
+        return _enabled[level-'A'];
+    }
 
     virtual void write_log(const char *str) { 
         // TODO This is a kludge... really ought to revamp the logging code to
         // do this smarter
         if (str[0] >= 'A' && str[0] <= 'Z' && str[1] == ' ') {
+            if (!_enabled[str[0]-'A']) return;
+
             int last = -1;
             for (int i = 0; i < 255; ++i) {
                 if (str[i] == '\0') {

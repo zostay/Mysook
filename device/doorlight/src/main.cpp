@@ -87,7 +87,7 @@ void init_filesystem() {
 void load_animation() {
     logger.logf_ln("I [main] Open bitmap file start");
 
-    bmp_file = LittleFS.open("/congrats-logan.manic", "r");
+    bmp_file = LittleFS.open("/andrew-heart-terri.manic", "r");
     if (!bmp_file) {
         logger.logf_ln("E [main] Failed to open bitmap file.");
         return;
@@ -206,6 +206,9 @@ void setup() {
     load_animation();
 #endif//ARDUINO
 
+    logger.set_enabled('D');
+
+    doorlight.set_animation(animation.get());
     doorlight.setup();
 }
 

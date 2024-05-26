@@ -16,7 +16,11 @@ public:
         this->add_pre_ticker(&animator);
     }
 
-    virtual unsigned long tick_speed() { return 100000; }
+    void set_animation(mysook::Animation *animation) {
+        animator.set_animation(animation);
+    }
+
+    virtual unsigned long tick_speed() { return 0; }
 
     virtual void start() {}
     virtual void tick() {}
